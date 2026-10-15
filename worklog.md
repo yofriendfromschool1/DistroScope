@@ -520,3 +520,24 @@ Stage Summary:
 - Dataset: 52 distros now carry governance + aiPolicy metadata, exposed in dialog + engine
 - Known items: clipboard copy unverifiable in headless (fallback path verified); aiPolicy data is a curated public-posture snapshot (hedged in UI copy, evolves fast); z-ai SDK token still missing (oracle degrades gracefully)
 - Next-round ideas: governance/AI filter chips in explorer, compare-dialog governance row, i18n, distro-dialog "add to compare" button, quiz profile radar in table rows, "most compared" og cards, a11y focus-order audit, more distros (RebornOS/blendOS/Nitrux) or ARM/phone category
+
+---
+Task ID: round-12
+Agent: main (Z.ai Code)
+Task: User request — write a README.md for the repo
+
+Current project status assessment (start of round):
+- v1.x stable per rounds 1–11 (52 distros / 18 questions / all 4 user-reported bugs fixed and browser-verified)
+- No root README.md existed (only /download/README.md from reference assets)
+
+Work Log:
+- Read worklog.md (rounds 1–11), package.json, prisma/schema.prisma, src/lib/types.ts to compile accurate facts
+- Verified against actual code before writing: footer Inspired-by URLs (yofriendfromschool1/Closest-Linux-Distros-to-OS, distrochooser/distrochooser, felagund1789/distrofinder), command-palette hotkeys (/ and Ctrl/Cmd+K via keydown metaKey/ctrlKey check), quiz number-key selection + "0" skip (quiz-section.tsx parseInt logic), .env DATABASE_URL pointing at db/custom.db
+- Created /home/z/my-project/README.md: tagline + inspired-by, Highlights (Graph Explorer / Distro Table / Finder quiz incl. two-pass relaxation / Compare & community stats / Beginner kit / power-user polish), Tech Stack table, Getting Started (bun install → .env DATABASE_URL → db:push → dev), Scripts table, annotated Project Structure tree, Matching Engine explainer (hard filters vs soft prefs, relaxed mode), API reference table (7 endpoints), Keyboard Shortcuts table, Data Notes (editorial snapshots, timeless copy, how to add a distro), Roadmap ideas, Acknowledgments w/ Beginner-Linux-Apps attribution, License note
+- Fixed during self-review: Tech Stack "AI (opt.)" row had a wrapped continuation line that would break markdown table rendering → single-line; footer-inspired URLs corrected to the exact repos used in the app; DATABASE_URL setup instruction made absolute-path (`file:$(pwd)/db/custom.db`) matching the real .env convention
+
+Stage Summary:
+- README.md (root) now documents the full feature set, stack, setup, structure, API and design decisions — accurate against the actual codebase (counts verified: 52 distros, 17 traits, 18 questions, 3 DB models, 7 API routes)
+- No app code touched this round; dev server untouched
+- Next-round ideas (carried over): governance/AI filter chips in explorer, compare-dialog governance row, i18n, distro-dialog "add to compare" button, quiz profile radar in table rows, "most compared" og cards, a11y focus-order audit, more distros (RebornOS/blendOS/Nitrux) or ARM/phone category
+
