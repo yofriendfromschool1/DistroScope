@@ -1,0 +1,672 @@
+✓ Screenshot saved to qa/round10-beginner-kit-fixed.png
+✅ File saved to: qa/round10-vlm2.json
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DistroScope - Beginner Kit</title>
+    <style>
+        :root {
+            --bg-color: #0f0518;
+            --card-bg: rgba(255, 255, 255, 0.04);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --accent-purple: #9333ea;
+            --accent-pink: #ec4899;
+            --accent-gold: #fbbf24;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --glass-blur: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(120, 0, 200, 0.25) 0%, transparent 40%),
+                radial-gradient(circle at 85% 30%, rgba(80, 0, 150, 0.2) 0%, transparent 45%),
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 60px 60px, 60px 60px;
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding-bottom: 4rem;
+        }
+
+        /* Navbar */
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 2rem;
+            background: rgba(20, 10, 30, 0.6);
+            backdrop-filter: blur(var(--glass-blur));
+            border-bottom: 1px solid var(--card-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-left { display: flex; align-items: center; gap: 3rem; }
+        
+        .logo {
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .logo-icon {
+            width: 28px; height: 28px;
+            background: linear-gradient(135deg, #d946ef, #9333ea);
+            border-radius: 6px;
+            display: grid; place-items: center;
+            color: white; font-weight: bold; font-size: 14px;
+        }
+        .logo span { color: white; } .logo span:last-child { color: #e879f9; }
+
+        .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover, .nav-links a.active { color: white; }
+        .nav-links a.active { font-weight: 500; }
+
+        .nav-right { display: flex; align-items: center; gap: 1rem; }
+        
+        .search-bar {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--card-border);
+            padding: 0.5rem 1rem;
+            border-radius: 999px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            width: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .kbd-shortcut {
+            background: rgba(255,255,255,0.1); 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-size: 0.7rem; 
+            margin-left: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #a855f7, #c026d3);
+            color: white;
+            border: none;
+            padding: 0.5rem 1.2rem;
+            border-radius: 99px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+            transition: transform 0.1s;
+        }
+        .btn-primary:active { transform: scale(0.98); }
+
+        /* Main Content */
+        main {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        /* Header Section */
+        header.text-center { text-align: center; margin-bottom: 3rem; position: relative; }
+        
+        .section-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--card-border);
+            padding: 0.4rem 1rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            backdrop-filter: blur(4px);
+        }
+        .badge-icon { color: var(--accent-gold); }
+
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #fff, #e9d5ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        h1 span { color: #f472b6; -webkit-text-fill-color: #f472b6; }
+
+        .subtitle {
+            max-width: 650px;
+            margin: 0 auto 2rem;
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+        }
+
+        .meta-tags {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .tag {
+            display: flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .tag svg { width: 14px; height: 14px; opacity: 0.8; }
+
+        /* Grid Layout */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        /* Glass Card Style */
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            backdrop-filter: blur(var(--glass-blur));
+            box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+        }
+
+        /* Left Column: Timeline */
+        .timeline-header {
+            margin-bottom: 1.5rem;
+        }
+        .timeline-header h2 { font-size: 1.25rem; margin-bottom: 0.3rem; }
+        .timeline-header p { font-size: 0.85rem; color: var(--text-secondary); }
+        
+        .progress-bar-container {
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+        .progress-fill {
+            position: absolute; left: 0; top: 0; bottom: 0;
+            width: 0%; /* Dynamic in JS usually, static here for demo */
+            background: linear-gradient(90deg, #fbbf24, #f59e0b);
+            border-radius: 2px;
+            width: 0%; /* Step 1 active implies some progress or just visual */
+        }
+        .progress-text {
+            display: flex; justify-content: space-between;
+            font-size: 0.75rem; color: var(--accent-gold); margin-top: 6px;
+            font-weight: 600;
+        }
+
+        .step-item {
+            display: flex;
+            gap: 1.2rem;
+            position: relative;
+            padding-bottom: 2rem;
+        }
+        .step-item:not(:last-child)::before {
+            content: '';
+            position: absolute;
+            left: 14px;
+            top: 32px;
+            bottom: 0;
+            width: 2px;
+            background: rgba(255,255,255,0.08);
+            z-index: 0;
+        }
+        /* Active line */
+        .step-item.active::before {
+            background: var(--accent-gold);
+            box-shadow: 0 0 8px var(--accent-gold);
+        }
+
+        .step-number {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--card-border);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+            z-index: 1;
+            position: relative;
+        }
+        .step-item.active .step-number {
+            background: rgba(251, 191, 36, 0.15);
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.2);
+        }
+
+        .step-content { flex: 1; }
+        .step-title-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.4rem; }
+        .step-title { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; }
+        .step-time { font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;}
+        
+        .step-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.8rem; line-height: 1.4; }
+        .step-code-hint {
+            font-family: monospace;
+            font-size: 0.75rem;
+            background: rgba(0,0,0,0.3);
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            color: #d8b4fe;
+            display: inline-block;
+        }
+
+        /* Right Column: Grid */
+        .right-header { margin-bottom: 1.5rem; }
+        .right-header h2 { font-size: 1.25rem; margin-bottom: 0.3rem; }
+        .right-header p { font-size: 0.85rem; color: var(--text-secondary); }
+
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .app-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .app-card:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+        }
+        .app-card::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.03));
+            pointer-events: none;
+        }
+
+        .app-top { display: flex; align-items: center; gap: 0.8rem; }
+        .app-icon {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            display: grid; place-items: center;
+            color: white;
+        }
+        .app-info h4 { font-size: 0.9rem; font-weight: 600; }
+        .app-info span { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;}
+
+        .app-id {
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.4);
+            background: rgba(0,0,0,0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            align-self: flex-start;
+        }
+
+        /* CTA Area */
+        .cta-box {
+            background: linear-gradient(105deg, rgba(168, 85, 247, 0.1), rgba(236, 72, 153, 0.05));
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .cta-text h3 { font-size: 1.1rem; margin-bottom: 0.3rem; }
+        .cta-text p { font-size: 0.85rem; color: var(--text-secondary); }
+        .btn-gh {
+            background: #21262d;
+            color: white;
+            border: 1px solid #30363d;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex; align-items: center; gap: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-gh:hover { background: #30363d; }
+
+        /* Floating Elements */
+        .fab {
+            position: fixed;
+            bottom: 2rem; right: 2rem;
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            display: grid; place-items: center;
+            color: white;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            z-index: 200;
+        }
+
+        /* Icons (SVG) */
+        .icon { width: 1em; height: 1em; fill: currentColor; }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-left">
+            <div class="logo">
+                <div class="logo-icon">DS</div>
+                <span>Distro</span><span>Scope</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#">Explorer</a></li>
+                <li><a href="#">Distro Finder</a></li>
+                <li><a href="#" class="active">Beginner Kit</a></li>
+                <li><a href="#">Community</a></li>
+            </ul>
+        </div>
+        <div class="nav-right">
+            <div class="search-bar">
+                <span>Search distros</span>
+                <span class="kbd-shortcut">⌘K</span>
+            </div>
+            <button style="background:none; border:none; color:#aaa; cursor:pointer;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+            </button>
+            <button class="btn-primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                Find my distro
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Header -->
+        <header class="text-center">
+            <div class="section-badge">
+                <span class="badge-icon">✦</span>
+                03 &nbsp;|&nbsp; BEGINNER KIT
+            </div>
+            <h1>Picked a distro? Day one, <span>sorted.</span></h1>
+            <p class="subtitle">The five first steps, the starter apps, and one script that sets it all up — curated in the community's Beginner-Linux-Apps guide. Works whichever distro you just installed.</p>
+            
+            <div class="meta-tags">
+                <div class="tag">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
+                    GUI-first, terminal optional
+                </div>
+                <div class="tag">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    Works on every distro
+                </div>
+                <div class="tag">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    About 15 minutes total
+                </div>
+            </div>
+        </header>
+
+        <!-- Two Column Layout -->
+        <div class="content-grid">
+            
+            <!-- Left Column: Timeline Checklist -->
+            <aside class="glass-card">
+                <div class="timeline-header">
+                    <h2>Your first 15 minutes</h2>
+                    <p>Tap a step to check it off — progress is saved on this device.</p>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div class="progress-fill" style="width: 10%;"></div>
+                </div>
+                <div class="progress-text">
+                    <span>0 of 5 done</span>
+                </div>
+
+                <div class="steps-list">
+                    <!-- Step 1 -->
+                    <article class="step-item active">
+                        <div class="step-number">01</div>
+                        <div class="step-content">
+                            <div class="step-title-row">
+                                <div class="step-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+                                    Update your system
+                                </div>
+                                <div class="step-time">~ 3 min</div>
+                            </div>
+                            <p class="step-desc">Before installing anything, run your distro's updater (Software Updater, Update Manager, Discover, App Center...) or one command. Always first — especially on rolling distros.</p>
+                            <code class="step-code-hint">the script below auto-detects your distro</code>
+                        </div>
+                    </article>
+
+                    <!-- Step 2 -->
+                    <article class="step-item">
+                        <div class="step-number">02</div>
+                        <div class="step-content">
+                            <div class="step-title-row">
+                                <div class="step-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                    Enable Flathub
+                                </div>
+                                <div class="step-time">~ 2 min</div>
+                            </div>
+                            <p class="step-desc">Flathub is the app store that works on every distro, so you're never limited by your distro's repositories. One command or a few clicks.</p>
+                        </div>
+                    </article>
+
+                     <!-- Step 3 (Partial/Clipped visually to match screenshot feel) -->
+                     <article class="step-item" style="opacity: 0.5;">
+                        <div class="step-number">03</div>
+                        <div class="step-content">
+                            <div class="step-title-row">
+                                <div class="step-title">Install the starter pack</div>
+                                <div class="step-time">~ 5 min</div>
+                            </div>
+                            <p class="step-desc">Copy the IDs from the right column...</p>
+                        </div>
+                    </article>
+                </div>
+            </aside>
+
+            <!-- Right Column: Apps Grid + CTA -->
+            <section>
+                <div class="glass-card" style="padding: 1.5rem;">
+                    <div class="right-header">
+                        <h2>The starter app pack</h2>
+                        <p>Tap any app to copy its Flatpak ID — the same app works on every distro.</p>
+                    </div>
+
+                    <div class="apps-grid">
+                        <!-- App 1 -->
+                        <div class="app-card">
+                            <div class="app-top">
+                                <div class="app-icon" style="color:#ff7139">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                                </div>
+                                <div class="app-info">
+                                    <h4>Firefox</h4>
+                                    <span>BROWSER</span>
+                                </div>
+                            </div>
+                            <div class="app-id">org.mozilla.firefox</div>
+                        </div>
+
+                        <!-- App 2 -->
+                        <div class="app-card">
+                            <div class="app-top">
+                                <div class="app-icon" style="color:#fff">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                </div>
+                                <div class="app-info">
+                                    <h4>LibreOffice</h4>
+                                    <span>OFFICE</span>
+                                </div>
+                            </div>
+                            <div class="app-id">org.libreoffice.LibreOffice</div>
+                        </div>
+
+                         <!-- App 3 -->
+                         <div class="app-card">
+                            <div class="app-top">
+                                <div class="app-icon" style="color:#ff8c00">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                </div>
+                                <div class="app-info">
+                                    <h4>VLC</h4>
+                                    <span>MEDIA PLAYER</span>
+                                </div>
+                            </div>
+                            <div class="app-id">org.videolan.VLC</div>
+                        </div>
+
+                        <!-- App 4 -->
+                        <div class="app-card">
+                            <div class="app-top">
+                                <div class="app-icon" style="color:#fff">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                </div>
+                                <div class="app-info">
+                                    <h4>GIMP</h4>
+                                    <span>IMAGE EDITOR</span>
+                                </div>
+                            </div>
+                            <div class="app-id">org.gimp.GIMP</div>
+                        </div>
+
+                        <!-- App 5 -->
+                        <div class="app-card">
+                            <div class="app-top">
+                                <div class="app-icon" style="color:#fff">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </div>
+                                <div class="app-info">
+                                    <h4>Joplin</h4>
+                                    <span>NOTES</span>
+                                </div>
+                            </div>
+                            <div class="app-id">net.cozic.Joplin</div>
+                        </div>
+
+                        <!-- App 6 -->
+                        <div class="app-card">
+                            <div class="app-top">
+                                <div class="app-icon" style="color:#fff">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                </div>
+                                <div class="app-info">
+                                    <h4>Thunderbird</h4>
+                                    <span>EMAIL</span>
+                                </div>
+                            </div>
+                            <div class="app-id">org.mozilla.Thunderbird</div>
+                        </div>
+
+                        <!-- App 7 -->
+                        <div class="app-card">
+                            <div class="app-top">
+                                <div class="app-icon" style="color:#5865F2">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+                                </div>
+                                <div class="app-info">
+                                    <h4>Discord</h4>
+                                    <span>CHAT</span>
+                                </div>
+                            </div>
+                            <div class="app-id">com.discordapp.Discord</div>
+                        </div>
+
+                        <!-- App 8 -->
+                        <div class="app-card">
+                            <div class="app-top">
+                                <div class="app-icon" style="color:#0088cc">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+                                </div>
+                                <div class="app-info">
+                                    <h4>Telegram</h4>
+                                    <span>CHAT</span>
+                                </div>
+                            </div>
+                            <div class="app-id">org.telegram.desktop</div>
+                        </div>
+
+                        <!-- App 9 -->
+                        <div class="app-card">
+                            <div class="app-top">
+                                <div class="app-icon" style="color:#1DB954">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.59 14.42c-.18.3-.56.39-.86.21-2.36-1.44-5.33-1.76-8.83-.97-.33.07-.66-.14-.74-.47-.07-.33.14-.66.47-.73 3.87-.87 7.19-.5 9.87 1.12.29.18.39.56.21.86zm1.15-2.56c-.23.37-.71.49-1.08.26-2.67-1.64-6.74-2.12-9.9-1.16-.42.13-.86-.11-.99-.53-.13-.42.11-.86.53-.99 3.62-1.09 8.16-.54 11.19 1.34.37.23.49.71.26 1.08zM17.84 11.1c-3.19-1.89-8.45-2.06-11.5-1.14-.51.15-1.04-.14-1.19-.65-.15-.51.14-1.04.65-1.19 3.62-1.09 8.45-.89 12.13 1.28.46.27.61.87.34 1.33-.27.46-.87.61-1.33.34z"/></svg>
+                                </div>
+                                <div class="app-info">
+                                    <h4>Spotify</h4>
+                                    <span>MUSIC</span>
+                                </div>
+                            </div>
+                            <div class="app-id">com.spotify.Client</div>
+                        </div>
+                    </div>
+
+                    <!-- CTA Box -->
+                    <div class="cta-box">
+                        <div class="cta-text">
+                            <h3>Run the whole setup with one script</h3>
+                            <p>Open-source, inspectable, works on any distro with Flatpak support.</p>
+                        </div>
+                        <button class="btn-gh">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                            View on GitHub
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- FAB -->
+    <div class="fab">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+    </div>
+
+</body>
+</html>
+```

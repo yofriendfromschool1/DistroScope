@@ -1,0 +1,331 @@
+     1→# DistroScope — Worklog
+     2→
+     3→Project: "Perfect Distro Finder" website (glassmorphic / liquid-glass design)
+     4→
+     5→Vision (from user):
+     6→- Inspired by Closest-Linux-Distros-to-OS, distrochooser, distrofinder
+     7→- Interactive graph of Linux distros at the top with filters
+     8→- Questionnaire ("finder") asking many important questions (device, experience, use case, hardware, privacy, updates, etc.)
+     9→- Super aesthetic glassmorphic / liquid-glass design
+    10→- Fully responsive, compatible with all devices
+    11→
+    12→Architecture decisions:
+    13→- Single route `/` (Next.js 16 App Router, TS, Tailwind 4, shadcn/ui, framer-motion, recharts)
+    14→- Dark-only theme (forced `.dark`), violet/fuchsia/rose/amber accents (NO indigo/blue)
+    15→- Static typed dataset in `src/data/distros.ts` (~42 distros) + `src/data/questions.ts` (11 questions)
+    16→- Matching engine (pure TS) in `src/lib/matching.ts`, exposed via `POST /api/match`
+    17→- Prisma (SQLite): QuizSession + DistroFeedback models; stats via `GET /api/stats`
+    18→- Page sections: Navbar / Hero / StatsStrip / GraphExplorer (id=explore) / Quiz+Results (id=finder) / Footer
+    19→- Graph: div-positioned scatter (x/y %), bubble size = popularity, color = family, axis presets, filters, OS-similarity highlighter, distro detail dialog w/ radar chart, compare tray (up to 3)
+    20→- Quiz: glass wizard, auto-advance single select, multi-select, progress, results with % rings, reasons, feedback thumbs, share
+    21→
+    22→Task IDs:
+    23→- Task 1 (me): types + worklog + architecture — DONE
+    24→- Task 2-a (subagent): dataset + questions data files
+    25→- Task 2-b (me): design system + shell (background/navbar/hero/footer/globals.css)
+    26→- Task 3 (me): matching engine + Prisma + APIs
+    27→- Task 4 (me): graph explorer UI
+    28→- Task 5 (me): quiz UI + results + stats strip
+    29→- Task 6 (me): lint + agent-browser QA
+    30→- Task 7 (me): final worklog + webDevReview cron (every 15 min)
+    31→
+    32→---
+    33→Task ID: 1
+    34→Agent: main (Z.ai Code)
+    35→Task: Define core types, create worklog, plan architecture
+    36→
+    37→Work Log:
+    38→- Explored project scaffold (Next.js 16 + Tailwind 4 + shadcn/ui + framer-motion + recharts + prisma available)
+    39→- Confirmed dev server running on :3000 (200 OK)
+    40→- Created src/lib/types.ts with Distro / DistroScores / QuizQuestion / QuizOption / MatchResponse / StatsResponse types
+    41→- Created this worklog.md
+    42→
+    43→Stage Summary:
+    44→- Type contracts frozen: dataset, questions, matching engine and UI must conform to src/lib/types.ts
+    45→- Next: launch Task 2-a (subagent data authoring) in parallel with Task 2-b (design shell)
+    46→
+    47→---
+    48→Task ID: 2-a
+    49→Agent: general-purpose (dataset author)
+    50→Task: Author src/data/distros.ts (42-distro typed dataset)
+    51→
+    52→Work Log:
+    53→- Read worklog.md and src/lib/types.ts to lock the binding type contract (Distro, DistroScores with 17 trait keys, DistroFamily)
+    54→- Created src/data/ and authored src/data/distros.ts: FAMILY_META (8 families, exact mandated hex colors), DISTROS (42 entries, exact ids and order), OS_SIMILARITY (exact id lists), USE_CASE_LABELS (all 16 vocabulary tags)
+    55→- Applied all provided score anchors verbatim; interpolated the handful of un-anchored (distro, trait) pairs by analogy with sibling distros
+    56→- Authored taglines (max 53 chars), 2-3 sentence timeless descriptions (no version numbers/dates), 3 pros + 3 cons each, official https websites, unique 1-2 letter initials
+    57→- Verified: bunx tsc --noEmit (zero errors from src/data/distros.ts), bun run lint (exit 0, clean), mandatory bun sanity script (count 42, unique ids 42, ALL CHECKS PASSED)
+    58→- Extra integrity pass: id order exact match, per-distro color == FAMILY_META[family].color, every used tag has a label, pros/cons exactly 3 each, all active, all https, difficulty 1-5, unique initials, no emojis (non-ASCII confined to comment headers)
+    59→
+    60→Stage Summary:
+    61→- Counts: 42 distros / 8 families (Ubuntu 10, Debian 9, Arch 5, Fedora 4, RHEL 3, SUSE 2, Gentoo 1, Independent 8); 17 score keys per distro; 16 use-case labels
+    62→- Verification: tsc = 4 pre-existing errors only (examples/websocket, skills/image-edit, skills/stock-analysis-skill - unrelated scaffold dirs, none from my file); eslint = clean pass; sanity script = ALL CHECKS PASSED
+    63→- Judgment calls: (1) Vanilla OS basedOn set to "Ubuntu" per spec, with description clarifying "Debian/Ubuntu lineage, now Debian-based" for v2 accuracy; (2) Nobara/Bazzite/Qubes OS rows omitted basedOn in the brief - set to "Fedora" (Qubes also uses Fedora templates, matching DistroWatch convention); (3) interpolated un-anchored scores: linux-lite stability 85, opensuse-leap freshness 35, garuda devExperience 78, pop-os windowsLike 30, linux-lite serverUse 25, alpine nvidiaSupport 35, tiny-core stability 65, plus customizability/outOfBox for ~20 distros via family analogues (e.g. KDE spins 82-85, RHEL rebuilds 50, minimal distros 5-20); (4) Qubes OS useCases kept as hinted (privacy, server) despite being desktop-centric; (5) Puppy Linux website uses official Woof-CE GitHub page, Tiny Core upgraded to https per requirement
+    64→
+    65→---
+    66→Task ID: 2-b, 3, 4, 5, 6
+    67→Agent: main (Z.ai Code)
+    68→Task: Design shell, matching engine + APIs, graph explorer, quiz UI, end-to-end QA
+    69→
+    70→Work Log:
+    71→- globals.css: full glassmorphism design system (glass/glass-strong/glass-soft/text-gradient/bg-grid/noise/mask-fade utilities, blob/float/marquee/shimmer/blink keyframes, dark-only palette, custom scrollbar, violet/fuchsia/rose/amber accents)
+    72→- layout.tsx: forced dark theme, DistroScope metadata, favicon.svg
+    73→- Components: background (animated aurora blobs + grid + grain + vignette), navbar (sticky glass pill, mobile Sheet menu, scroll intensify), hero (staggered framer reveals, animated terminal card, floating chips, distro marquee, scroll hint), stats-strip (count-up, live /api/stats, refreshes on quiz-done event), footer (sticky mt-auto, inspiration GitHub links)
+    74→- src/data/questions.ts: 11 questions (device, experience, terminal, use-case, software philosophy, hardware quirks, look, privacy, updates, help, adventure) with calibrated weights + hard requirements (maxRam, needsArm)
+    75→- src/lib/matching.ts: weighted scoring engine over 17 traits, hard-filter pass, normalization to 28-99%, reason generation from top contributions with 17 templates + fallbacks
+    76→- Prisma: QuizSession + DistroFeedback models (SQLite, pushed)
+    77→- APIs: GET /api/distros, POST /api/match (zod-validated, saves session, returns top 6 with reasons), GET /api/stats (grouped top matches), POST /api/feedback
+    78→- Graph explorer: 3 switchable axis presets (Ease & Control / Ready vs Lean / Solid vs Fresh), deterministic jitter anti-overlap, size-by-popularity bubbles with brand family colors, spring-animated repositioning, hover tooltips (edge-aware flip), distro detail dialog (recharts radar, stats, pros/cons, use-case chips), compare tray (max 3, rolling) + side-by-side compare table with per-row best highlighting, OS-similarity highlighter (Windows/macOS/ChromeOS), full filter panel (search, family, package manager, DE, release model, performance slider, gaming/privacy switches) with mobile Sheet, empty state, small-bubbles-on-top stacking fix
+    79→- Quiz: intro card, 11-question wizard with progress segments, single auto-advance + multi (max 3) with Continue, keyboard shortcuts (1-9, Enter, ArrowLeft), analyzing animation with rotating messages, results view (match rings with gradient stroke animation, reason cards, runners-up, ranked list with animated bars, feedback thumbs, share/copy, retake, view-on-graph integration)
+    80→- zustand store: shared highlight (quiz results -> graph) + compare state
+    81→
+    82→QA (agent-browser + VLM visual review):
+    83→- Verified: page loads 200, 0 console/page errors; 42 bubbles render; axis switch, family filter (10 Ubuntu), OS chips, distro dialog (radar/pros/cons), compare tray + table, full quiz x3 profiles (beginner -> Mint, privacy expert -> CachyOS, etc.), view-on-graph highlight pill, feedback POST, stats live counts, mobile 390px (no h-scroll, filter sheet, hamburger), sticky footer exact
+    84→- Fixed during QA: bubble click interception (small-bubbles-on-top stacking), osFocus vs quiz highlight conflict (derived state, lint-clean), duplicate Filters heading in mobile sheet, axis label contrast, secondary button contrast, chip touch targets, unused imports, setState-in-effect lint error, /api/match TS unknown-type error
+    85→- VLM reviews: hero "Premium & Cohesive / Excellent", results "polished, high-fidelity", mobile "aesthetic holds up very well"
+    86→
+    87→Stage Summary:
+    88→- Feature-complete v1: graph explorer + filters + compare + 11-question quiz + results + community stats, all on glassmorphic dark theme, fully responsive
+    89→- lint: 0 errors; tsc: 0 errors (project src); dev server clean
+    90→- Ideas for next phase: table/list view toggle for explorer, quiz deep-links (shareable URL state), "surprise me" random distro, per-question weighting explanation tooltips, radar overlay compare in dialog, DB-driven most-loved distro in stats, pagination/scroll for long lists, LLM-powered "explain this match" endpoint
+    91→
+    92→---
+    93→Task ID: webDevReview-round-1
+    94→Agent: main (Z.ai Code, cron webDevReview)
+    95→Task: QA pass + new features: table view, compare radar overlay, surprise-me, styling polish
+    96→
+    97→Current project status assessment:
+    98→- v1 stable: page 200, all APIs healthy, 0 console errors, lint/tsc clean
+    99→- QA smoke test: 42 bubbles, stats live, quiz present
+   100→
+   101→Work Log:
+   102→- QA via agent-browser: page load, controls, no errors — all green
+   103→- NEW src/components/distro-table.tsx: sortable table view (Distro/Family/RAM/Level/Ease/Speed/Gaming/Privacy/Popularity columns), sticky glass header, score mini-bars, difficulty dots, match-row glow, per-row compare + website actions, empty state
+   104→- Graph explorer: Graph/Table view toggle (LayoutGrid/Table2 icons, axis presets hidden in table mode), Surprise-me dice button (random distro from filtered pool + toast + rotating dice icon), extracted shared CompareTrayBar (floating on graph, static under table), mode-aware caption
+   105→- Compare dialog: added "Trait overlay" radar section — all compared distros overlaid on one 8-trait recharts radar with color legend
+   106→- Styling polish: hero stat chips hover lift + glow, quiz selected-option gradient accent bar (framer layoutId), amber hover for Surprise me
+   107→- BUGFIXES during QA: (1) sticky header broken — position:sticky on thead doesn't work; moved to th cells + switched table to border-separate border-spacing-0 + moved row borders to cells; (2) shadcn table wrapper overflow-x-auto created intermediate scroll ancestor breaking sticky — neutralized with [&>div]:!overflow-visible; (3) JSX mismatched closing tag after view-mode refactor (fixed)
+   108→- Verified: sorting both directions (name asc = Alpine first, RAM desc = Qubes first), row click opens dialog, compare from table works, radar overlay renders N polygons, th stays at 1px offset when scrolled 500px, mobile 390px no horizontal scroll, quiz accent bar renders on multi-select
+   109→
+   110→Stage Summary:
+   111→- lint 0 errors, tsc 0 errors, dev server clean (GET / 200)
+   112→- Features added: table view w/ sortable+sticky header, compare radar overlay, surprise-me, styling polish
+   113→- VLM reviews: compare radar "clean, professional, functionally clear"; table sticky header visually confirmed solid glass background
+   114→- Remaining ideas for next round: quiz deep-links (shareable URL state), "surprise me" easter egg animation, table column chooser, DB-driven most-loved distro in stats strip, LLM-powered match explanation, radar overlay in distro dialog vs quiz profile, keyboard shortcut for surprise (S), persisted view-mode/table-sort preference
+   115→
+   116→---
+   117→Task ID: webDevReview-round-2
+   118→Agent: main (Z.ai Code, cron webDevReview)
+   119→Task: QA pass + styling polish round + new features (deep-links, AI oracle, prefs, community verdict)
+   120→
+   121→Current project status assessment:
+   122→- v1.x stable: page 200, all APIs healthy, 0 console errors, lint/tsc clean
+   123→- A transient parse error seen earlier in dev.log (graph-explorer.tsx mid-edit) was already resolved
+   124→- Full agent-browser QA: 42 bubbles, table view 42 rows, family filter (Arch=5), quiz end-to-end (top match Linux Mint), stats API live, mobile 390px no h-scroll, 0 errors
+   125→
+   126→Work Log:
+   127→- VLM visual review of hero/explorer/results: 7.5/10 with specific feedback (body contrast, headline weight, toolbar grouping, dialog metadata rhythm, glass edge definition, OS chip contrast)
+   128→- NEW src/lib/quiz-url.ts: compact answer codec (question/option indices -> URL-safe base64) + buildShareUrl
+   129→- NEW src/app/api/explain/route.ts: POST endpoint using z-ai-web-dev-sdk (backend only) — builds user profile + top-3 traits prompt, LLM returns 2-paragraph personalized match explanation with caveat + first-week tip; graceful 502 fallback
+   130→- Quiz deep-links: results replaceState to ?q=<code>#finder; fresh load restores answers and re-analyzes (strict-mode ref guard, no double POST); retake clears param; share copies full link with answers embedded
+   131→- AI oracle UI in results: dashed glass trigger button -> animated panel (Bot avatar, text-shimmer heading, blinking dots, shimmer-line skeleton while loading, staggered paragraph reveal, retry link on failure)
+   132→- Stats: /api/stats now computes favorite (most-loved by feedback ratio, min 2 votes); stats-strip redesigned to 4 tiles (quizzes / crowd favorite / community verdict with thumbs % bar / top matches) with explicit responsive borders (2x2 sm -> 4 across lg); listens for distrscope:feedback-given event
+   133→- Graph explorer: viewMode persisted to localStorage (distroscope:view); "S" hotkey rolls surprise-me when explorer in view (ref pattern, input-safe); toolbar divider between axis presets and view toggle; Chip resting contrast raised (text-foreground/70, border-white/12)
+   134→- Styling polish per VLM: --muted-foreground 0.72->0.78 oklch; glass borders 0.10->0.14 / strong 0.17; hero H1 font-extrabold + body text-foreground/75 + CTA mt-8->mt-7; terminal window deep shadow + ambient violet glow + glowing traffic lights; distro-dialog Stat labels (uppercase tracking 0.09em, /80 muted) vs values (13.5px /95 fg) + content-start grid + trait profile 0-100 scale hint; navbar scroll progress beam (violet->fuchsia->amber, scaleX, only when scrolled); table row padding py-2.5->py-3.5; globals: gradient-x keyframes + text-shimmer utility
+   135→
+   136→Verification (agent-browser + curl):
+   137→- Quiz -> results -> URL contains ?q= code; reload restores straight to results (desktop + mobile 390px)
+   138→- POST /api/explain 200 in ~1.6s; oracle panel renders personalized text ("first-time user with an old laptop...")
+   139→- Retake clears q param; view-mode table persists across reload (42 rows), switching back to graph shows 42 bubbles
+   140→- Synthetic keydown 's' fires surprise (toast + Vanilla OS dialog); note: agent-browser CDP keyboard type does not reach window keydown listeners — automation artifact, not an app bug
+   141→- Stats strip 4 tiles render, verdict tile present; mobile: no horizontal scroll anywhere
+   142→- lint: 0 errors; tsc: 0 errors; dev.log clean
+   143→- VLM re-review of new UI: 9/10 (up from 7.5) — "polished, high-fidelity execution of dark glassmorphic interface"
+   144→
+   145→Stage Summary:
+   146→- Features added this round: shareable quiz deep-links (?q= restore), AI oracle match explanation (LLM backend), persisted view preference, S hotkey, community verdict tile (4-tile stats strip), navbar scroll progress beam
+   147→- Styling: contrast/hierarchy/edge-definition pass across globals, hero, dialog, explorer, table; VLM score 7.5 -> 9
+   148→- Remaining ideas for next round: compact navbar on scroll (collapse height), quiz answer editing from results (jump back), per-question weight explanation tooltips, distro-of-the-day hero easter egg, offline fallback text for oracle, i18n, table column chooser, DB-driven trending chart in stats (recharts area), "compare from URL" deep-links (c= param), export results as PNG card
+   149→
+   150→---
+   151→Task ID: webDevReview-round-3
+   152→Agent: main (Z.ai Code, cron webDevReview)
+   153→Task: QA pass + new features: community pulse chart, PNG share card, closest cousins, CSV export, compact navbar
+   154→
+   155→Current project status assessment (start of round):
+   156→- v1.x stable per prior rounds; dev server was DOWN at round start (process had died) — restarted via nohup bun run dev, 200 OK
+   157→- Full agent-browser QA first: 42 bubbles, table view w/ family filter (Ubuntu=10), quiz E2E (11 questions, incl. multi-select Continue handling), deep-link restore, mobile 390px no h-scroll, 0 console errors
+   158→- Confirmed already implemented from backlog (unlogged round between 2 and 3): quiz answer editing from results (editAnswer + collapsible "Your answers" panel), per-question "why we ask" tooltips, distro-of-the-day hero spotlight, compare deep-links (?c= restore + sync + share)
+   159→- Truly remaining backlog: trending chart, PNG share card, CSV export, dialog cousins, compact navbar → built this round
+   160→
+   161→Work Log:
+   162→- /api/stats: added `daily` — 14 UTC day-buckets of quiz activity (findMany createdAt, JS bucketing, zero-filled, oldest first); StatsResponse type updated; zeroed-bucket fallback on error
+   163→- NEW src/lib/similarity.ts: TRAIT_KEYS (all 17) + closestDistros(distro, n) — euclidean distance over full trait vector, normalized to similarity % (1-100), pure client-safe
+   164→- stats-strip: NEW "Community pulse" panel (2nd row) — recharts AreaChart (violet→fuchsia gradient fill, monotone, activeDot w/ white ring), custom glass Tooltip, XAxis every-3rd-day labels, YAxis int-only; header with live pulse dot, "N this week" counter, week-over-week delta badge (emerald ▲ / rose ▱); graceful "no activity yet" copy when all zeros
+   165→- NEW src/lib/share-card.ts: pure-canvas 1200×675 PNG share card (drawShareCard + downloadShareCard) — gradient bg + radial glows + subtle grid, glass card border, gradient DistroScope header, gradient match ring w/ glow, top-distro name/tagline/meta pills, 4 ranked rows with colored dots + gradient score bars, footer CTA + URL; letterSpacing Chromium support w/ graceful fallback
+   166→- quiz-section: "Save as image" action button (ImageDown icon, emerald hover) calling downloadShareCard with success/destructive toasts
+   167→- distro-dialog: NEW "Closest cousins" section — 3 nearest distros by 17-trait similarity as clickable chips (initials avatar, "% alike", hover lift); new onNavigate prop swaps dialog content in place; wired in graph-explorer (setSelectedId) and quiz-section (setSelectedDistro); removed duplicated GitCompare icon ternary
+   168→- graph-explorer: "Export CSV" toolbar button (Download icon, emerald hover, disabled on empty pool) — exports filtered pool w/ BOM, full metadata + all 17 trait scores + website, proper quote escaping, toast w/ count; table-mode caption mentions export
+   169→- navbar: compact-on-scroll — h-14→h-12, header pt shrinks, logo icon size-9→8 + text-[15px]→text-sm when scrolled (500ms ease, also fixed a missing transition on header)
+   170→- distro-table: row hover accent (inset fuchsia left bar via shadow) + group class
+   171→
+   172→Verification (agent-browser + VLM + curl):
+   173→- GET /api/stats returns daily[14]; chart SVG renders, delta badge "+100% vs last week" visible; VLM: "polished, accessible, visually balanced... no glitches"
+   174→- Cousins: Ubuntu → Fedora 84% / openSUSE Leap 83% / Debian 81%; clicking Debian cousin swaps dialog to Debian (verified content)
+   175→- CSV: blob intercepted — 5865 bytes, text/csv;charset=utf-8, button disabled-when-empty logic present
+   176→- PNG card: blob intercepted — 1001446 bytes image/png; all elements verified via isolated VLM review (ring centered, pills aligned, 4 ranked rows, footer URL; earlier "clipped URL" claim disproven via pixel-crop re-review); localhost URL is expected in dev (uses window.location.origin)
+   177→- Navbar: 56px→48px on scroll, cleanly on top (crop-verified); pulse chart + cousins verified on mobile 390px, no h-scroll anywhere, 0 console errors after full-page scroll + dialog interactions
+   178→- lint: 0 errors; tsc: only 4 pre-existing scaffold errors (examples/, skills/ — unrelated); dev.log clean
+   179→
+   180→Stage Summary:
+   181→- Features added this round: community pulse activity chart (DB-driven), PNG share card export (pure canvas), closest-cousins discovery in distro dialog, CSV export of filtered pool, compact scrolling navbar, table row hover accents
+   182→- Project now covers: graph+table explorer, filters, compare (w/ radar overlay + deep links), 11-question quiz (deep links, answer editing, AI oracle, PNG export), 42-distro dataset w/ similarity engine, community stats (tiles + pulse chart)
+   183→- Known minor items: quiz deep-link code uses option indices (stable as long as questions don't reorder); VLM reviews occasionally hallucinate (cross-checked pixel crops when suspicious)
+   184→- Remaining ideas for next round: table column chooser, quiz profile radar (user trait vector vs top match), keyboard shortcut help dialog (?), i18n, og:image dynamic route using share-card canvas (server-side), feedback hover states on runners-up, "skip question" support, Print/PDF styles
+   185→
+   186→---
+   187→Task ID: webDevReview-round-4
+   188→Agent: main (Z.ai Code, cron webDevReview)
+   189→Task: QA pass + new features: You-vs-match trait radar, keyboard shortcuts help (?), skip-question, table column chooser
+   190→
+   191→Current project status assessment (start of round):
+   192→- v1.x stable: server up (200), 42 bubbles, table 42 rows, surprise+cousins dialog, stats API (13 quizzes, daily[14]), mobile no h-scroll, 0 console errors
+   193→- No bugs found in QA — proceeded to backlog features
+   194→
+   195→Work Log:
+   196→- matching.ts: NEW computeUserProfile(answers) — translates answers into a 0-100 user trait vector (50 neutral, >50 wants more) via PROFILE_BOUNDS normalization (per-trait max reachable net weight, capped by single=1/multi=3 selection limits); pure, client-safe
+   197→- similarity.ts: NEW TRAIT_LABELS (human-readable labels for all 17 traits)
+   198→- quiz-section: NEW "Trait alignment" panel in results — ProfileRadar component: recharts radar overlay with 8 traits, dashed fuchsia "You" polygon + solid distro-colored match polygon, legend chips, "Your strongest asks" (top-3 |v-50| traits with center-anchored directional mini-bars), neutral-fallback copy; intro tip line extended with 0/? hints
+   199→- quiz-section: NEW skip-question support — SkipForward ghost button (amber hover) for single (own row) and multi (footer beside Continue), skipQuestion callback clears any selection and advances (stale-answer-safe analyze at last question), keyboard "0", progress segments show skipped as amber/35 (answered=fuchsia/60), multi hint texts mention skipping; results "Your answers" already renders "Skipped"
+   200→- NEW src/components/shortcuts-dialog.tsx: ShortcutsDialog (global "?" hotkey toggles a glass dialog listing Quiz/Explorer/Anywhere shortcuts with styled kbd keys) + ShortcutsHint (footer client button) — navbar got a Keyboard icon trigger (sm+); mounted in page.tsx
+   201→- distro-table: NEW column chooser — "Columns" popover (Checkbox list of 8 optional columns, min-1 guard, localStorage distroscope:cols persistence across reloads); header + body cells refactored to activeSpecs-driven rendering; quiz-matches chip hidden on xs to fit
+   202→- footer: shortcuts hint link (Keyboard icon + ? kbd) next to the credits
+   203→- Styling: focus-visible rings on quiz option buttons and skip buttons; runner-up quiz-matches chip responsive tweak
+   204→
+   205→Verification (agent-browser + VLM):
+   206→- "?" hotkey toggles shortcuts dialog; navbar Keyboard button + footer hint both open it; content renders all groups; closed via sr-only Close button (NOTE: dialog close button has sr-only text, not aria-label — first QA close attempts were silent no-ops, dialog stayed open through quiz test; final close verified)
+   207→- Quiz with skips: Skip button on Q1 + keyboard "0" on Q3 → progress segment 1 computed amber oklab(/0.35) verified; results show 2 "Skipped" entries in Your-answers panel; radar renders 2 polygons + 16 dots; VLM: "visually polished and well-designed, no obvious defects, overlaps, or clipping"
+   208→- Column chooser: Gaming hidden → header list drops it; localStorage persisted; survives reload; restored — verified end-to-end
+   209→- Mobile 390px: no h-scroll; footer hint opens shortcuts dialog; 0 console errors after full-page scroll
+   210→- lint: 0 errors; tsc: only pre-existing scaffold errors; dev.log clean; 42 bubbles/42 rows re-verified
+   211→
+   212→Stage Summary:
+   213→- Features added this round: You-vs-match trait alignment radar (profile engine + UI), global keyboard shortcuts help (?), skip-question flow (button + 0 key + amber progress state), persisted table column chooser, footer/navbar shortcuts affordances
+   214→- Styling: focus-visible accessibility rings, directional center-anchored ask-bars, amber skip affordances consistent with surprise-me hover language
+   215→- Known minor items: agent-browser dialog-close automation must target sr-only text "Close" (aria-label absent); strongest-asks bars show top-3 expressed traits only
+   216→- Remaining ideas for next round: server-side og:image route (next/og, needs font bundling), i18n, quiz "compare your profile vs any distro" from ranked list, print/PDF styles, keyboard shortcut for column chooser / view toggle (G/T), "share profile card" variant of PNG card showing user radar
+   217→
+   218→---
+   219→Task ID: webDevReview-round-5
+   220→Agent: main (Z.ai Code, cron webDevReview)
+   221→Task: QA pass + new features: Ctrl+K command palette, You-vs-any-distro overlay, profile card PNG, G/T hotkeys, styling detail pass
+   222→
+   223→Current project status assessment (start of round):
+   224→- v1.x stable: server up (200), 42 bubbles, table 42 rows, full quiz E2E (Ubuntu 99% for beginner profile), deep-link restore, mobile 390px no h-scroll, 0 console errors
+   225→- No bugs found in initial QA — proceeded to backlog features
+   226→
+   227→Work Log:
+   228→- QA methodology note: mid-round the browser page entered visibility:hidden (stale second tab) which throttled rAF and stalled framer-motion exit animations, making quiz phase transitions + deep-link restore LOOK broken. Verified against stashed baseline (also "broken" → automation artifact, not an app bug). After closing the stale tab (page visible) everything works. ALSO: `offsetParent` is null for position:fixed dialog content — use getComputedStyle().display checks when testing dialogs. agent-browser eval returns of >50KB strings stall the CLI — for large payloads (PNG data URLs) use a tiny local HTTP relay + fetch from the page.
+   229→- NEW src/components/command-palette.tsx: global Ctrl+K/⌘K command palette (cmdk via shadcn Command primitives inside glass Dialog) — 7 actions (quiz/explore/stats jump, view switches, surprise, shortcuts) + all 42 distros with colored initials avatars, family tag, tagline; footer bar with counts + nav hints; PaletteHint trigger button (navbar sm+, mobile Sheet full-width, footer "Quick access")
+   230→- Event bridges: window events distrscope:open-distro (detail: id → graph-explorer sets selectedId + scrolls to #explore), distrscope:set-view (graph|table), distrscope:surprise — graph-explorer registers listeners; palette stays decoupled from section tree
+   231→- graph-explorer: G/T hotkeys switch graph/table view (explorer-in-view only, same pattern as S); shortcuts dialog updated (G/T rows, Ctrl+K row)
+   232→- distro-dialog: NEW optional profile prop — when present, trait radar overlays dashed fuchsia "You" polygon + legend chips + header swaps to "You vs this distro"; Stat cards now wrap (leading-snug break-words) instead of truncate (fixed "Absolute begin..." clipping); ui/dialog.tsx close button got aria-label="Close dialog" (a11y + testability)
+   233→- quiz-section: passes userProfile to DistroDialog in results phase — ANY distro opened from results (top match, runners-up, ranked list, cousins) shows the You overlay; ranked-list rows got "vs you" Swords icon button (hover-revealed, sm+) + per-row hover bg + GitCompare + score bars; card-sweep specular highlight on hero match / trait alignment / runners-up cards
+   234→- share-card.ts: NEW drawProfileCard + downloadProfileCard (1200×675 PNG) — canvas-drawn 8-trait radar (dashed You polygon + solid match polygon, grid rings, spokes, vertex dots, axis labels, legend), "YOUR STRONGEST ASKS" with directional center-anchored gradient bars (compact labels via COMPACT_LABELS — fixed "macOS familia..." truncation found by VLM), TOP MATCHES 3 rows, footer; refactored shared drawBackdrop; quiz-section "Save profile card" button (RadarIcon, violet hover, rotate-90 hover)
+   235→- globals.css: NEW card-sweep utility (specular light sweep ::after on hover, reduced-motion aware), glass-lift (hover lift + edge glow, for non-motion elements), link-underline (fuchsia underline draw-in); prefers-reduced-motion: reduce global kill-switch for animations/transitions
+   236→- Styling polish: stats tiles hover bg-white/[0.03], footer Explore links link-underline + Quick access palette button, palette action hint contrast /70→full muted
+   237→
+   238→Verification (agent-browser + VLM + relay capture):
+   239→- Ctrl+K opens palette (49 items = 7 actions + 42 distros); typing "arch" filters to 5 Arch-family distros; Enter selects → palette closes → distro dialog opens (verified Zorin OS + cousins section); scrollIntoView to #explore works
+   240→- G/T hotkeys: table switch (42 rows) and back to graph (42 bubbles) — synthetic keydown on window (CDP keyboard doesn't reach window listeners)
+   241→- Quiz E2E (visible page): 11 answers → results (Ubuntu), deep-link ?q= updated, Save profile card + 3 vs-you buttons present; vs-you click → dialog "You vs this distro" label + "You — dashed" legend + 2 radar polygons (verified .recharts-radar-polygon count = 2)
+   242→- Profile card PNG: blob image/png ~1MB captured via local relay → VLM review 8.5/10 ("production-ready"), asks labels fixed and re-verified fully visible; palette VLM 9/10; vs-you dialog VLM 8.5/10 (Stat truncation fixed); results actions row PASS; hero with navbar palette button 9/10
+   243→- Deep-link restore verified on BOTH baseline (stashed) and round-5 build after visibility fix
+   244→- Mobile 390px: no h-scroll after full-page scroll; palette opens at 358px width, fits viewport; mobile Sheet contains full-width palette hint; footer palette button present; 0 console errors
+   245→- lint: 0 errors (qa-tmp QA scripts removed after use); tsc: 0 project errors; dev.log clean
+   246→
+   247→Stage Summary:
+   248→- Features added this round: Ctrl+K command palette (fuzzy distro search + 7 actions), You-vs-any-distro radar overlay in distro dialog (profile prop), profile-card PNG export (canvas radar + strongest asks), G/T view hotkeys, navbar/footer/sheet palette affordances
+   249→- Styling: card-sweep specular hover on results cards, glass-lift + link-underline utilities, prefers-reduced-motion support, stats tile hovers, ranked-row hover states with hover-revealed actions, Stat wrap fix, palette/dialog contrast polish
+   250→- Known items: framer-motion animations stall on hidden tabs (browser behavior — by design, no fix needed); command palette filter is simple substring (cmdk default) not fuzzy
+   251→- Remaining ideas for next round: server-side og:image route (next/og), i18n, print/PDF styles, fuzzy matching in palette (custom cmdk filter), "compare your profile vs any distro" from graph dialog too (currently quiz results only), quiz progress persistence (localStorage resume), table column chooser presets, DB-driven trending families chart
+   252→
+   253→---
+   254→Task ID: webDevReview-round-6
+   255→Agent: main (Z.ai Code, cron webDevReview)
+   256→Task: QA pass + new features (quiz resume, global You-vs-distro, fuzzy palette, family heat) + mandatory styling detail pass
+   257→
+   258→Current project status assessment (start of round):
+   259→- v1.x stable per rounds 1–5: server up (200), 42 bubbles, table 42 rows, quiz E2E (99% match), deep-links, all APIs healthy (stats 25→27 quizzes during QA, match 200, feedback 200)
+   260→- ENVIRONMENT ISSUE FOUND: z-ai SDK auth token is missing in this sandbox (/etc/.z-ai-config has baseUrl+apiKey but no token → 401 "missing X-Token header"). Consequences: (1) POST /api/explain returns the DESIGNED graceful fallback {"error":"The AI oracle is unreachable right now"} → UI shows error state + retry link — not an app bug; (2) VLM visual reviews unavailable this round — QA done via DOM/computed-style checks instead (rigorous: geometry, computed styles, innerText, localStorage, event flows)
+   261→- No app bugs found in QA → proceeded to backlog features (4 items) + mandatory styling pass
+   262→
+   263→Work Log:
+   264→- NEW src/lib/quiz-progress.ts: saveQuizProgress/loadQuizProgress/clearQuizProgress (key "distroscope:progress"; validates question/option ids against QUIZ_QUESTIONS; requires index≥1 AND ≥1 answer to be resumable)
+   265→- NEW src/lib/fuzzy.ts: fuzzyScore — subsequence matcher with word-start + consecutive-run bonuses AND a density gate (query chars / match span < 0.25 → reject), so "lmint" matches ONLY Linux Mint (+AlmaLinux) instead of 20 distros; prefix bonus; empty query = neutral 1
+   266→- store.ts: added profile: DistroProfile | null + setProfile/clearProfile (zustand) — the quiz result's trait vector now lives globally
+   267→- /api/stats: NEW families field — groupBy topMatch over ALL sessions, name→family via DISTROS dataset (server-side import), tally, sort desc, top 6; StatsResponse.families typed optional; error → []
+   268→- quiz-section: (a) resume flow — mount effect loads progress when no ?q= deep-link (deep-link supersedes), intro card shows amber resume banner (History icon, "Question N of 11 · X answered", Resume button w/ welcome-back toast, Start fresh link clears storage); (b) save-progress effect during quiz phase (index+answers); (c) analyze() clears progress + setProfile(computeUserProfile(finalAnswers)) on success; (d) retake clears progress + clearProfile; (e) editAnswer path unaffected
+   269→- graph-explorer: DistroDialog gets profile from global store → "You vs this distro" radar overlay now works from the EXPLORER (bubbles/table/palette), not just quiz results; NEW distrscope:filter-family event listener (validates family, appends to filters.families, scrolls to #explore)
+   270→- command-palette: filter swapped to fuzzyScore; placeholder mentions fuzzy; footer counts add "fuzzy search on"
+   271→- stats-strip: NEW FamilyHeat panel (3rd row) — top-6 family share bars w/ FAMILY_META colors, glow dots, count · % share, whole row is a button dispatching distrscope:filter-family (→ explorer filters + scrolls); hidden when no data
+   272→- Styling pass (globals.css + components):
+   273→  · NEW utilities: scrollbar-slim (6px themed, fuchsia hover — applied to distro-dialog, compare-dialog, palette list, explorer filter panel, mobile filters sheet), eyebrow-rule (fading hairline), starfield (6-layer tiled radial-gradient dots), chip-glass (crisper small-element glass)
+   274→  · background.tsx: starfield layer (opacity 60) + slow conic aurora sweep (140vmax, 90s spin-slower, opacity 5%) + existing blobs/grid/grain/vignette
+   275→  · NEW src/components/section-eyebrow.tsx: SectionEyebrow (mono gradient index + icon + tracked uppercase label + hairline rule, left/center variants) — explorer header "01 · EXPLORE", quiz header "02 · FINDER" (replaces plain pills)
+   276→  · hero: chip-glass on stat chips, active:scale-[0.98] press feedback on both CTAs
+   277→  · quiz: press feedback on start/resume/continue buttons; amber resume banner styling
+   278→  · footer: gradient top hairline (fuchsia via-transparent) + violet top glow
+   279→  · --animate-spin-slower (90s) added to theme
+   280→
+   281→Verification (agent-browser DOM-based + unit script):
+   282→- Quiz resume E2E: answered 3 questions → localStorage {index:3, answers:3} verified → reload → resume banner "Question 4 of 11 · 3 answered" → click Resume → 4/11 restored + toast → completed → 99% Linux Mint + storage cleared + ?q= deep-link updated; retake → ?q= cleared + profile cleared
+   283→- You-vs-distro from explorer: after quiz, clicked Fedora bubble → dialog "YOU VS THIS DISTRO" + dashed legend + 2 radar polygons; after retake, Arch dialog → "TRAIT PROFILE" + 1 polygon (overlay correctly gone)
+   284→- Fuzzy palette: "lmint" → exactly Linux Mint + AlmaLinux (was 20 items before density gate); Enter → Linux Mint dialog opens; unit-tested scorer (nobara/gentoo exact prefixes score 284, quiz action matches, MX/Ubuntu rejected for lmint)
+   285→- Family heat: 3 rows render (Ubuntu 25·89%, Arch 2, Independent 1); click Arch row → explorer shows 5 Arch bubbles + scrolled to #explore
+   286→- Styling computed-style checks: starfield bg-image + opacity 0.6, conic sweep 90s, 3 eyebrow-rules w/ gradient bg, chip-glass border rgba(255,255,255,0.13)
+   287→- Toast system re-verified working (surprise → "Rolled the dice — Gentoo Linux" in viewport; earlier misses were late checks past the 5s dismissal)
+   288→- Mobile 390px: full-page scroll 0 errors, no h-scroll, resume banner renders ("Question 6 of 11"), family rows stack 1-col
+   289→- Desktop 1440px: full-page scroll 0 errors, no h-scroll, FAMILY HEAT + eyebrows render
+   290→- lint: 0 errors; tsc: 0 project errors (only pre-existing scaffold); dev.log clean (all 200s)
+   291→
+   292→Stage Summary:
+   293→- Features added this round: quiz progress persistence w/ resume banner (localStorage), global You-vs-distro profile overlay (works in explorer/table/palette-opened dialogs), fuzzy command-palette search (density-gated), DB-driven Family heat panel (clickable → explorer family filter), distrscope:filter-family event bridge
+   294→- Styling: starfield + conic aurora layers, editorial numbered section eyebrows w/ hairlines, scrollbar-slim on all inner scrollers, chip-glass stat chips, button press feedback, footer hairline+glow
+   295→- Environment issue (NOT an app bug): z-ai SDK token missing in this sandbox → AI oracle degrades gracefully (502 + retry link); VLM reviews unavailable — used DOM-based QA instead
+   296→- Remaining ideas for next round: server-side og:image route (next/og), i18n, print/PDF styles, table column chooser presets, "surprise me" easter egg animation, quiz profile radar in distro dialog from table rows (vs-you button in table), export family-heat as part of share card, keyboard shortcut for resume (R on intro)
+   297→
+   298→---
+   299→Task ID: webDevReview-round-7
+   300→Agent: main (Z.ai Code, cron webDevReview)
+   301→Task: QA pass + new features (og:image social cards, print/PDF support, tooltip upgrades, R resume shortcut) + styling detail pass
+   302→
+   303→Current project status assessment (start of round):
+   304→- v1.x stable per rounds 1–6: server up (200), 42 bubbles, stats API (28 quizzes, 3 families), full-page scroll 0 errors on desktop + mobile 390px, no h-scroll
+   305→- Baseline QA clean → proceeded to backlog (og:image route, print/PDF styles, tooltip polish, R shortcut)
+   306→
+   307→Work Log:
+   308→- NEW src/app/api/og/route.tsx (.tsx REQUIRED — Turbopack doesn't parse JSX in .ts): GET /api/og (branded card) + ?q=<code> (personalized match card via decodeQuizAnswers + computeMatches, top-3); satori constraints handled — conic-gradient unsupported → ring arc drawn as encodeURIComponent'd SVG data-URI background w/ stroke-dasharray + rotate(-90); radial-gradient glows OK; fonts read from system (Carlito Bold/Regular + DejaVu Mono Bold via fs/promises); Wordmark/Ring/RankedRow/GenericCard/MatchCard components, 1200×630
+   309→- page.tsx: NEW generateMetadata — ?q= deep-links get personalized og:image + twitter:card summary_large_image (awaited searchParams, q length-guarded); layout.tsx: metadataBase (NEXT_PUBLIC_SITE_URL fallback localhost) + full openGraph.images + twitter cards; silences the metadataBase warning
+   310→- Print/PDF support: globals.css NEW @page { margin: 14mm } (MUST live OUTSIDE @media — nested @page made LightningCSS drop the whole print block; found via cssRules inspection: printRuleCount was 0) + @media print { CSS vars → white/dark; html/body white !important; .glass/.glass-strong/.glass-soft/.chip-glass flattened to paper (no backdrop, hairline border, no shadow); .text-gradient/.text-shimmer → solid #7c3aed; * print-color-adjust exact (ring/bars keep color); animations/transitions off; break-inside avoid on cards }
+   311→- print:hidden applied to: navbar header, Background, Hero section, StatsStrip section, GraphExplorer section, Footer, results actions row, AI-oracle trigger button, feedback/visit/compare row, ToastViewport (fixed element was repeating + adding a blank trailing page)
+   312→- quiz-section: finder section print:py-6 + column print:mt-4 (killed the blank 3rd page — content ended 2 pages + padding); NEW "Print / PDF" button in results actions (Printer icon, amber hover, scale-110 hover, window.print())
+   313→- similarity.ts: NEW profileSimilarity(profile, distro) — euclidean % over ONLY expressed traits (neutral skipped, ≥2 traits required), null when insufficient signal
+   314→- graph-explorer tooltip upgrade: axis-preset mini stat bars (TRAIT_LABELS labels + distro-colored gradient bars + mono values for preset y/x traits) + fuchsia "You: NN% alike" fit chip when global profile exists; Swords icon import added
+   315→- R shortcut for resume: window keydown handler when phase=intro && resume (input/meta/ctrl/alt-safe) → resumeQuiz; FIXED TDZ bug — effect must be declared AFTER resumeQuiz (dep array evaluates at render); resumeQuiz converted to useCallback([resume, toast]); removed stale unused eslint-disable (lint warning); kbd R badge inside Resume button; ShortcutsDialog Quiz group + "R — Resume a saved run (intro screen)" row
+   316→
+   317→Verification (agent-browser + curl + pdftoppm):
+   318→- /api/og generic: 200, 115KB PNG 1200×630 (IHDR parsed), palette check: 1655 unique colors, #0d0b12 bg 63%, #f4f2f9 text, violet glow tones
+   319→- /api/og?q= (99% Mint code): 200, 135KB PNG, 2502 colors incl. #e95420 (Ubuntu orange arc) — content verified structurally
+   320→- HTML meta: /?q=… → og:image = /api/og?q=<code> absolute w/ width/height; / → generic /api/og; twitter:card summary_large_image both
+   321→- Print PDF (agent-browser pdf): 2 pages, 94/96% white + black text; pdftotext confirms page 1 = eyebrow 02 FINDER + headline + PERFECT MATCH card (ring 99%, 3 reason columns, meta chips) + TRAIT ALIGNMENT radar; page 2 = runners-up, ALSO WORTH A LOOK ranked rows, Your answers; all chrome hidden; colored elements retained via print-color-adjust
+   322→- Tooltip: focus-triggered hover state shows name/tagline + CUSTOMIZABILITY 55 / EASE OF USE 90 bars (default preset); after deep-link quiz (profile set) Fedora tooltip shows "You: 79% alike" + chips
+   323→- R shortcut: localStorage progress set → reload → banner + kbd R render → synthetic keydown 'r' → quiz at 6/11 + banner gone
+   324→- Regression: desktop 1440 + mobile 390 full-scroll 0 console errors, no h-scroll; lint 0 errors/0 warnings; tsc 0 project errors; dev.log clean
+   325→
+   326→Stage Summary:
+   327→- Features added this round: dynamic og:image social cards (generic + personalized via ?q=, server-rendered satori), print/PDF stylesheet + Print button (2 clean pages), graph tooltip axis mini-bars + You-alike fit line, R keyboard shortcut for quiz resume
+   328→- Bugs found & fixed: JSX-in-.ts compile error (→ .tsx); satori conic-gradient unsupported (→ SVG data-URI ring); nested @page dropped the entire @media print block (→ hoisted, verified via cssRules count); blank trailing print page (→ toast viewport print:hidden + print spacing trims); TDZ on resumeQuiz effect (→ reordered + useCallback)
+   329→- Environment note: z-ai SDK token still missing (oracle gracefully degrades — by design)
+   330→- Remaining ideas for next round: i18n, table column chooser presets, "surprise me" easter egg animation, distro-dialog "add to compare" from tooltip, og:image for compare links (?c=), hero terminal typed animation loop, DB-driven weekly trending distro (not family), keyboard shortcut for palette focus (/), export ranked list as Markdown
+   331→

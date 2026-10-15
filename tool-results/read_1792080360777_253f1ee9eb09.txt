@@ -1,0 +1,191 @@
+   280→
+   281→Verification (agent-browser DOM-based + unit script):
+   282→- Quiz resume E2E: answered 3 questions → localStorage {index:3, answers:3} verified → reload → resume banner "Question 4 of 11 · 3 answered" → click Resume → 4/11 restored + toast → completed → 99% Linux Mint + storage cleared + ?q= deep-link updated; retake → ?q= cleared + profile cleared
+   283→- You-vs-distro from explorer: after quiz, clicked Fedora bubble → dialog "YOU VS THIS DISTRO" + dashed legend + 2 radar polygons; after retake, Arch dialog → "TRAIT PROFILE" + 1 polygon (overlay correctly gone)
+   284→- Fuzzy palette: "lmint" → exactly Linux Mint + AlmaLinux (was 20 items before density gate); Enter → Linux Mint dialog opens; unit-tested scorer (nobara/gentoo exact prefixes score 284, quiz action matches, MX/Ubuntu rejected for lmint)
+   285→- Family heat: 3 rows render (Ubuntu 25·89%, Arch 2, Independent 1); click Arch row → explorer shows 5 Arch bubbles + scrolled to #explore
+   286→- Styling computed-style checks: starfield bg-image + opacity 0.6, conic sweep 90s, 3 eyebrow-rules w/ gradient bg, chip-glass border rgba(255,255,255,0.13)
+   287→- Toast system re-verified working (surprise → "Rolled the dice — Gentoo Linux" in viewport; earlier misses were late checks past the 5s dismissal)
+   288→- Mobile 390px: full-page scroll 0 errors, no h-scroll, resume banner renders ("Question 6 of 11"), family rows stack 1-col
+   289→- Desktop 1440px: full-page scroll 0 errors, no h-scroll, FAMILY HEAT + eyebrows render
+   290→- lint: 0 errors; tsc: 0 project errors (only pre-existing scaffold); dev.log clean (all 200s)
+   291→
+   292→Stage Summary:
+   293→- Features added this round: quiz progress persistence w/ resume banner (localStorage), global You-vs-distro profile overlay (works in explorer/table/palette-opened dialogs), fuzzy command-palette search (density-gated), DB-driven Family heat panel (clickable → explorer family filter), distrscope:filter-family event bridge
+   294→- Styling: starfield + conic aurora layers, editorial numbered section eyebrows w/ hairlines, scrollbar-slim on all inner scrollers, chip-glass stat chips, button press feedback, footer hairline+glow
+   295→- Environment issue (NOT an app bug): z-ai SDK token missing in this sandbox → AI oracle degrades gracefully (502 + retry link); VLM reviews unavailable — used DOM-based QA instead
+   296→- Remaining ideas for next round: server-side og:image route (next/og), i18n, print/PDF styles, table column chooser presets, "surprise me" easter egg animation, quiz profile radar in distro dialog from table rows (vs-you button in table), export family-heat as part of share card, keyboard shortcut for resume (R on intro)
+   297→
+   298→---
+   299→Task ID: webDevReview-round-7
+   300→Agent: main (Z.ai Code, cron webDevReview)
+   301→Task: QA pass + new features (og:image social cards, print/PDF support, tooltip upgrades, R resume shortcut) + styling detail pass
+   302→
+   303→Current project status assessment (start of round):
+   304→- v1.x stable per rounds 1–6: server up (200), 42 bubbles, stats API (28 quizzes, 3 families), full-page scroll 0 errors on desktop + mobile 390px, no h-scroll
+   305→- Baseline QA clean → proceeded to backlog (og:image route, print/PDF styles, tooltip polish, R shortcut)
+   306→
+   307→Work Log:
+   308→- NEW src/app/api/og/route.tsx (.tsx REQUIRED — Turbopack doesn't parse JSX in .ts): GET /api/og (branded card) + ?q=<code> (personalized match card via decodeQuizAnswers + computeMatches, top-3); satori constraints handled — conic-gradient unsupported → ring arc drawn as encodeURIComponent'd SVG data-URI background w/ stroke-dasharray + rotate(-90); radial-gradient glows OK; fonts read from system (Carlito Bold/Regular + DejaVu Mono Bold via fs/promises); Wordmark/Ring/RankedRow/GenericCard/MatchCard components, 1200×630
+   309→- page.tsx: NEW generateMetadata — ?q= deep-links get personalized og:image + twitter:card summary_large_image (awaited searchParams, q length-guarded); layout.tsx: metadataBase (NEXT_PUBLIC_SITE_URL fallback localhost) + full openGraph.images + twitter cards; silences the metadataBase warning
+   310→- Print/PDF support: globals.css NEW @page { margin: 14mm } (MUST live OUTSIDE @media — nested @page made LightningCSS drop the whole print block; found via cssRules inspection: printRuleCount was 0) + @media print { CSS vars → white/dark; html/body white !important; .glass/.glass-strong/.glass-soft/.chip-glass flattened to paper (no backdrop, hairline border, no shadow); .text-gradient/.text-shimmer → solid #7c3aed; * print-color-adjust exact (ring/bars keep color); animations/transitions off; break-inside avoid on cards }
+   311→- print:hidden applied to: navbar header, Background, Hero section, StatsStrip section, GraphExplorer section, Footer, results actions row, AI-oracle trigger button, feedback/visit/compare row, ToastViewport (fixed element was repeating + adding a blank trailing page)
+   312→- quiz-section: finder section print:py-6 + column print:mt-4 (killed the blank 3rd page — content ended 2 pages + padding); NEW "Print / PDF" button in results actions (Printer icon, amber hover, scale-110 hover, window.print())
+   313→- similarity.ts: NEW profileSimilarity(profile, distro) — euclidean % over ONLY expressed traits (neutral skipped, ≥2 traits required), null when insufficient signal
+   314→- graph-explorer tooltip upgrade: axis-preset mini stat bars (TRAIT_LABELS labels + distro-colored gradient bars + mono values for preset y/x traits) + fuchsia "You: NN% alike" fit chip when global profile exists; Swords icon import added
+   315→- R shortcut for resume: window keydown handler when phase=intro && resume (input/meta/ctrl/alt-safe) → resumeQuiz; FIXED TDZ bug — effect must be declared AFTER resumeQuiz (dep array evaluates at render); resumeQuiz converted to useCallback([resume, toast]); removed stale unused eslint-disable (lint warning); kbd R badge inside Resume button; ShortcutsDialog Quiz group + "R — Resume a saved run (intro screen)" row
+   316→
+   317→Verification (agent-browser + curl + pdftoppm):
+   318→- /api/og generic: 200, 115KB PNG 1200×630 (IHDR parsed), palette check: 1655 unique colors, #0d0b12 bg 63%, #f4f2f9 text, violet glow tones
+   319→- /api/og?q= (99% Mint code): 200, 135KB PNG, 2502 colors incl. #e95420 (Ubuntu orange arc) — content verified structurally
+   320→- HTML meta: /?q=… → og:image = /api/og?q=<code> absolute w/ width/height; / → generic /api/og; twitter:card summary_large_image both
+   321→- Print PDF (agent-browser pdf): 2 pages, 94/96% white + black text; pdftotext confirms page 1 = eyebrow 02 FINDER + headline + PERFECT MATCH card (ring 99%, 3 reason columns, meta chips) + TRAIT ALIGNMENT radar; page 2 = runners-up, ALSO WORTH A LOOK ranked rows, Your answers; all chrome hidden; colored elements retained via print-color-adjust
+   322→- Tooltip: focus-triggered hover state shows name/tagline + CUSTOMIZABILITY 55 / EASE OF USE 90 bars (default preset); after deep-link quiz (profile set) Fedora tooltip shows "You: 79% alike" + chips
+   323→- R shortcut: localStorage progress set → reload → banner + kbd R render → synthetic keydown 'r' → quiz at 6/11 + banner gone
+   324→- Regression: desktop 1440 + mobile 390 full-scroll 0 console errors, no h-scroll; lint 0 errors/0 warnings; tsc 0 project errors; dev.log clean
+   325→
+   326→Stage Summary:
+   327→- Features added this round: dynamic og:image social cards (generic + personalized via ?q=, server-rendered satori), print/PDF stylesheet + Print button (2 clean pages), graph tooltip axis mini-bars + You-alike fit line, R keyboard shortcut for quiz resume
+   328→- Bugs found & fixed: JSX-in-.ts compile error (→ .tsx); satori conic-gradient unsupported (→ SVG data-URI ring); nested @page dropped the entire @media print block (→ hoisted, verified via cssRules count); blank trailing print page (→ toast viewport print:hidden + print spacing trims); TDZ on resumeQuiz effect (→ reordered + useCallback)
+   329→- Environment note: z-ai SDK token still missing (oracle gracefully degrades — by design)
+   330→- Remaining ideas for next round: i18n, table column chooser presets, "surprise me" easter egg animation, distro-dialog "add to compare" from tooltip, og:image for compare links (?c=), hero terminal typed animation loop, DB-driven weekly trending distro (not family), keyboard shortcut for palette focus (/), export ranked list as Markdown
+   331→
+   332→---
+   333→Task ID: webDevReview-round-8
+   334→Agent: main (Z.ai Code, cron webDevReview)
+   335→Task: QA pass + new features (typed hero terminal, dice burst, / palette shortcut, Markdown export, weekly trending panel, compare og:image) + mandatory styling detail pass
+   336→
+   337→Current project status assessment (start of round):
+   338→- v1.x stable per rounds 1–7: server 200, 42 bubbles, quiz E2E (Mint 99%), deep-links, compare flow, palette (49 items), all APIs healthy (stats 33→35 quizzes during QA)
+   339→- Baseline QA clean (desktop 1440 + mobile 390 full-scroll 0 errors, no h-scroll) → proceeded to backlog features + styling pass
+   340→- VLM visual review unavailable again this round (z-ai SDK token still missing → 401) — QA done via DOM/computed-style checks + curl + direct lib unit tests (bun script)
+   341→
+   342→Work Log:
+   343→- NEW hero typed terminal: useTypedTerminal hook (hero.tsx) — types `distroscope --find-me` (~52ms/char), prints 5 Q&A/ok/result lines char-by-char (12–19ms/char), rests 4.6s with blinking cursor, clears and loops forever; useReducedMotion → static full render (no loop); timers tracked in a Set for clean unmount; cmd line moved out of TERMINAL_LINES into TERMINAL_CMD
+   344→- NEW src/components/dice-burst.tsx: DiceBurst — 16 seeded particles (mulberry32 PRNG keyed by roll counter → SSR-stable, different look per roll) in 3 shapes (dot/spark/ring), distro-accent color + 5-color palette, framer-motion outward flight + fade, AnimatePresence re-keys per roll (old burst exits while new fires); render-derived via useMemo (NO setState in effect — React Compiler lint enforces this)
+   345→- graph-explorer: surprise button wrapped in relative div w/ DiceBurst(trigger=diceSpin, accent=last pick color via new surpriseAccent state); dice icon now tumbles via motion.span (spring rotate + scale pop 1→1.35→1 per roll, per-property transitions); active:scale-95 press feedback
+   346→- command-palette: "/" now opens the palette (guard: no modifiers, target AND document.activeElement not input/textarea/contenteditable — isTypingTarget helper); PaletteHint kbd shows "/" below md, ⌘K above; shortcuts-dialog Anywhere group gained "/ — Open the command palette (quick)" row + footer text updated
+   347→- NEW src/lib/markdown-export.ts: buildResultsMarkdown (GFM doc: H1 title w/ top match + score, intro line w/ share link, 🏆 Perfect match w/ reasons bullets + meta blockquote, 🥈 Runners-up table, 📋 Also-worth-a-look table (ranks 5–15 w/ first reason), 📝 My answers list w/ skipped markers, footer CTA) + copyToClipboard with 3-way fallback chain (async clipboard → execCommand textarea → .md file download)
+   348→- quiz-section: NEW "Copy Markdown" button in results actions (ClipboardCopy icon, rose hover); toasts per outcome ("Markdown copied" / "Markdown downloaded" / destructive "Could not copy")
+   349→- /api/stats: NEW weekly field — groupBy topMatch where createdAt >= now−7d, take 5, filtered to known distros; StatsResponse.weekly typed
+   350→- stats-strip: NEW TrendingThisWeek panel (4th row) — amber live-dot header "Trending this week · hottest matches over the last 7 days" + "N quizzes in 7 days" counter; chips w/ rank #, family-colored dot w/ glow, name, ×count, per-count gradient fill bar (absolute, left-anchored, hover brightens); click → distrscope:open-distro (dialog + scroll); hidden when empty
+   351→- /api/og: NEW CompareCard variant — GET /api/og?c=id1,id2[,id3] validates ids (slice 3, ≥2 required else falls back to generic); headline "NAME vs NAME (vs NAME)" w/ colored words + mono vs, per-distro column cards (initials avatar, name, family, tagline w/ ellipsis, Rolling/Point + RAM + package chips), per-distro radial glows (left/middle/right positioned)
+   352→- page.tsx generateMetadata: ?c= links (validated ^[a-z0-9,-]+$ < 128 chars) now get og:image=/api/og?c=… + summary_large_image; imports/renders SectionDivider ×3 (hero→stats→explore→finder) + BackToTop
+   353→- NEW src/components/section-divider.tsx + .section-divider utility (globals.css): gradient hairline + ::after traveling light pulse (18% wide fuchsia/violet blur sweep, travel-x keyframes, 7s cubic-bezier loop); print:hidden; frozen by the global reduced-motion kill-switch
+   354→- NEW src/components/back-to-top.tsx: floating glass button (bottom-right, size-11 touch target, z-40 under toasts/dialogs), appears >700px scroll via AnimatePresence spring, hover lift + fuchsia glow, smooth-scrolls to top; print:hidden
+   355→- globals.css: travel-x keyframes, section-divider + overlay-vignette utilities; ui/dialog.tsx + ui/sheet.tsx overlays swapped bg-black/50 → overlay-vignette (radial, darker at edges — dialogs float in space)
+   356→- hero marquee: group-hover pause (animation-play-state) + chip hover (border-white/25, bg lift, text-foreground, violet glow shadow)
+   357→- quiz progress: active segment now animate-pulse-soft + fuchsia glow shadow (was static gradient)
+   358→- distro-table: row hover accent now per-distro color (CSS var --accent = d.color+cc, hover:shadow-[inset_2.5px_0_0_0_var(--accent)]) instead of fixed fuchsia
+   359→- compare tray chips: border tinted with distro color (d.color55) + dot glow (d.color88 shadow)
+   360→
+   361→Bugs found & fixed this round:
+   362→1. CRITICAL typo: stats-strip dispatched "distrscope:open-distro" (missing 'o') → trending chips did nothing; fixed to "distroscope:open-distro" (verified: chip click → Mint dialog + scroll)
+   363→2. Dev server process died mid-round (runtime error from an intermediate half-applied edit left DiceBurst undefined, then the process vanished) → restarted `bun run dev` in background (nohup), verified 200
+   364→3. markdown-export referenced option.title (doesn't exist on QuizOption — only label/hint/icon) → TS error, fixed to label-only
+   365→4. React Compiler lint error "setState synchronously within an effect" on DiceBurst → restructured to render-derived particles (useMemo from trigger) + AnimatePresence re-keying (no state, no effect)
+   366→5. Clipboard fully blocked in restrictive contexts (headless QA browser denied BOTH async clipboard AND execCommand) → added .md file download fallback so users always get their export
+   367→6. Edit-tool hazard noted: one large multi-part edit partially applied despite an error report (weekly refs landed without the definition) — caught via grep, completed manually; verified full file after
+   368→
+   369→Verification (agent-browser DOM-based + curl + bun unit script):
+   370→- Typed terminal: cmd length sampled over 12s → 21(full/rest) → reset → retype cycle observed, 0 errors; reduced=false honored
+   371→- Dice burst: surprise click → 16 particles in-flight (computed box-shadow + opacity checks) → 0 after 1.2s; distro dialog opens; dice tumbles (motion.span)
+   372→- "/" shortcut: opens palette (49 items); typed '/' inside palette input keeps palette open; real-Escape closes; handler guards input/textarea/contentEditable via target + activeElement
+   373→- Markdown: quiz E2E (11 Qs incl. multi-select Continue handling) → Mint result → button present → click → "Markdown downloaded" toast in headless (clipboard denied); bun unit test of buildResultsMarkdown: 46-line doc w/ title/runners table/also-worth-a-look/answers/skipped/link all present
+   374→- Weekly trending: API returns [Mint 19, Ubuntu 12, Zorin 1, Tiny Core 1, CachyOS 1]; panel renders 5 chips; chip #1 click → Linux Mint dialog + scrolled to #explore
+   375→- og:image: generic (115KB) / compare-2 (102KB) / compare-3 (159KB) all 1200×630 PNG, md5-distinct; invalid/partial ?c= gracefully falls back to generic; ?c= page meta → og:image=/api/og?c=… + twitter summary_large_image
+   376→- Styling: 3 section-dividers present w/ travel-x 7s on ::after; back-to-top appears >700px + click → scrollY<50; marquee pause class wired (group on parent, pause class on row); overlay-vignette on dialog+sheet overlays; table --accent var set per row
+   377→- Shortcuts dialog: "/ — Open the command palette (quick)" row present
+   378→- Deep-link regression: /?q=<code> restores results (PERFECT MATCH) 0 errors
+   379→- Desktop 1440 full-scroll: 0 errors, no h-scroll; mobile 390 full-scroll: 0 errors, no h-scroll; lint 0 errors; tsc 0 project errors; dev.log all 200s
+   380→
+   381→Stage Summary:
+   382→- Features added this round: looping typed hero terminal (reduced-motion aware), dice-roll particle burst + tumbling dice icon, "/" palette shortcut (+ docs + mobile kbd hint), Copy-as-Markdown export w/ 3-way clipboard fallback, DB-driven weekly trending panel (clickable chips), compare og:image cards (?c=) + meta wiring, SectionDivider light-sweep dividers, BackToTop floating button
+   383→- Styling pass: overlay radial vignette (dialogs + sheets), marquee hover-pause + chip polish, quiz active-segment glow, per-distro table row hover accents, distro-tinted compare tray chips, back-to-top + divider glass styling
+   384→- Environment note: z-ai SDK token still missing (VLM/oracle unavailable — oracle degrades gracefully by design)
+   385→- Remaining ideas for next round: i18n, table column chooser presets, hero terminal "q" params rotating per loop (vary the typed persona), quiz profile radar in table rows, export ranked list as JSON (API consumers), keyboard nav for family-heat/trending rows (arrow keys), DB-driven "most compared" stat, print styles for the explorer table (currently print:hidden), a11y audit pass (focus order in dialogs)
+   386→
+   387→---
+   388→Task ID: webDevReview-round-9
+   389→Agent: main (Z.ai Code, cron webDevReview)
+   390→Task: QA pass + new features (rotating hero personas, community duel arena w/ CompareEvent DB, column presets, JSON export, arrow-key stats navigation) + mandatory styling detail pass + print explorer table
+   391→
+   392→Current project status assessment (start of round):
+   393→- v1.x stable per rounds 1–8: server 200, 42 bubbles, table 42 rows, quiz E2E (Linux Mint top match), stats API healthy (40 quizzes, daily[14], families 3, weekly 5), deep-links, mobile 390px no h-scroll, 0 console errors — NO app bugs found in baseline QA
+   394→- z-ai SDK token still missing in this sandbox (oracle degrades gracefully by design; VLM reviews unavailable — DOM/computed-style QA used instead)
+   395→
+   396→Work Log:
+   397→- INFRA issue found & resolved: after `bun run db:push` (new CompareEvent model) the dev server kept serving a stale Prisma client (POST /api/compare → 500). Restarting the dev server fixed it; NOTE for this sandbox: background processes die with the Bash session unless started with `setsid --fork bun run dev` — plain `nohup ... &` is NOT enough (documented for future rounds)
+   398→- NEW hero terminal rotating personas: TERMINAL_PERSONAS (the newcomer / the privacy maven / the tinkerer — each with own Q&A + result lines), useTypedTerminal loops persona-per-cycle, personaIdx in TermState, reduced-motion renders the deterministic persona-of-the-day, new terminal footer ("run as X · next: Y · ● live"), min-h on lines area so layout never jitters between personas
+   399→- NEW community duel arena (most-compared pairs, DB-driven): prisma CompareEvent model (sorted comma-joined ids, db:pushed), POST /api/compare (zod 2–3 ids, unknown-id reject), /api/stats `compared` field (groupBy take 5), DuelArena panel in stats-strip (5th row; empty state copy; initials-avatars "A vs B" rows with share-fill background; click → distrscope:open-compare), graph-explorer onOpenCompare bridge (validates ids, setCompare + setCompareOpen + scroll), recordCompare on dialog-open effect w/ double dedupe (localStorage last-40 keys + session Set) → POST → distrscope:compare-recorded event → stats reload
+   400→- NEW table column presets: COLUMN_PRESETS Compact/Standard/Everything buttons above the checkbox list in the Columns popover (aria-pressed highlight when exact match, otherwise neutral), persisted via existing distroscope:cols
+   401→- NEW JSON export: src/lib/json-export.ts buildResultsJson (generator/version/generatedAt/shareUrl/dataset card, answers w/ labels+ids+skipped, expressed trait profile w/ legend note, ranked matches w/ full distro meta + 17-trait scores) + downloadResultsJson blob; "Download JSON" button (Braces icon, teal hover) in results actions
+   402→- NEW arrow-key navigation for stats panels: arrowNav(cols) roving helper (Left/Right ±1, Up/Down ±cols, wraps, focuses first) applied to family-heat grid (2-col), trending chips (1-col), duel arena grid (2-col) + role=group aria-labels on all three
+   403→- STYLING detail pass (mandatory): graph bubbles got a specular highlight dot (liquid-glass sphere look) + group-hover halo ring (intensified family glow, 0.3s fade); distro-dialog Stat cards got card-sweep (specular sweep on hover); quiz option icons scale-110 + border brighten on group-hover; table rows now keyboard-focusable (tabIndex, Enter/Space → open dialog, fuchsia focus-visible inset ring); ::selection was already themed (verified)
+   404→- PRINT explorer table: GraphExplorer section now prints ONLY in table view (conditional print:hidden; header/controls/OS-chips/toolbar/caption/tray hidden in print), DistroTable print overrides (no max-h clip, no rounded glass, transparent header cells, Actions column+cells hidden) — table prints across pages w/ proper pagination (verified via agent-browser pdf: 4 pages, headers + all 42 rows)
+   405→
+   406→Bugs found & fixed this round:
+   407→1. POST /api/compare 500 — stale Prisma client after db:push; fixed via dev-server restart (documented above)
+   408→2. distro-table.tsx JSX syntax: missing `}` on COLUMN_PRESETS.map closer + unclosed wrapper div — caught by tsc, fixed
+   409→3. json-export.ts referenced desktopEnvironments (not on Distro type) → corrected to desktops
+   410→4. Dev server process dying between Bash commands — resolved with setsid --fork (sandbox process-management quirk, NOT an app bug)
+   411→
+   412→Verification (agent-browser DOM-based + curl + PDF):
+   413→- Persona rotation: after ~24s the terminal showed "run as the tinkerer" (3rd persona) — full cycle confirmed; footer + "next:" hint render; mobile footer present
+   414→- Duel arena: 5 seeded rows render; row click → CompareDialog opens ("Arch Linux vs Linux Mint"), ?c= synced, explorer scrolled; stats count 4→5 proves recordCompare→POST→compare-recorded→reload chain end-to-end
+   415→- Column presets: popover (opens via JS click — agent-browser physical click double-toggles Radix, automation artifact) shows Compact/Standard/Everything; Compact click → headers = Distro/Family/RAM/Level/Popularity/Actions, localStorage saved 4 keys
+   416→- JSON export: blob intercepted — 13,322 bytes, valid JSON, generator/version/shareUrl/answers/profile/matches all present; "JSON downloaded" toast path works
+   417→- Arrow keys: family row focus → ArrowRight moves Ubuntu→Arch; ArrowDown wraps (2-col grid, 3 rows); ArrowUp wraps back — roving nav verified on real key presses
+   418→- Keyboard table rows: row focus + Enter → distro dialog opens (6 Stat cards w/ card-sweep)
+   419→- Print: table view → PDF 4 pages, table headers + rows + finder intro only (all chrome hidden); graph mode still fully print:hidden
+   420→- Quiz E2E re-run on final build: Linux Mint top match, ?q= deep-link, all 10 result actions present (incl. Download JSON)
+   421→- Mobile 390px full-scroll: 0 errors, no h-scroll; desktop 1440px full-scroll: 0 errors, no h-scroll
+   422→- lint: 0 errors; tsc: 0 project errors (only pre-existing scaffold); dev.log all 200s
+   423→
+   424→Stage Summary:
+   425→- Features added this round: hero terminal rotating personas + persona footer, community duel arena (CompareEvent DB + API + panel + open-compare bridge + deduped recording), table column presets, JSON results export, arrow-key navigation across stats panels, keyboard-activatable table rows, print support for the explorer table view
+   426→- Styling: bubble specular dots + hover halos, dialog Stat card-sweep, quiz option icon hover scale/border, table row focus rings, print-flattened table
+   427→- Project now covers: graph+table explorer (printable), filters, compare (w/ radar + deep links + community tracking), 11-question quiz (deep links, resume, answer editing, AI oracle, PNG/MD/JSON exports, print), 42-distro dataset + similarity engine, community stats (tiles + pulse chart + family heat + trending + duel arena), command palette, shortcuts
+   428→- Known items: agent-browser physical clicks double-toggle Radix popovers (use JS .click() in QA); keyboard type events don't reach window keydown listeners (use synthetic dispatchEvent); compare-recording dedupe is per-browser (multi-device users count once each — intended)
+   429→- Remaining ideas for next round: i18n, og:image for duel arena links, "compare preset columns" in compare dialog, distro-dialog "add to compare" button, quiz profile radar from table rows (vs-you in table), export community stats as JSON (API consumers), "most compared" og cards, a11y audit (focus order in dialogs), weekly trending distro spotlight in hero
+   430→
+   431→---
+   432→Task ID: round-10
+   433→Agent: main (Z.ai Code)
+   434→Task: User-requested features — init-system question + Artix Linux & 9 more distros + Beginner-Linux-Apps recommendation + general improvements
+   435→
+   436→Current project status assessment (start of round):
+   437→- v1.x stable per rounds 1–9 (52→ previously 42 distros, 11 questions, all features verified)
+   438→- Dev server healthy on :3000; user request: add important questions (esp. init systems), Artix + more distros, recommend github.com/yofriendfromschool1/Beginner-Linux-Apps to beginners, general polish
+   439→
+   440→Work Log:
+   441→- TYPES: added InitSystem union ("systemd"|"OpenRC"|"runit"|"SysVinit"|"s6"|"dinit"|"shepherd"|"other"), Distro.initSystem + Distro.initNote, DesktopEnvironment +="Trinity", hardRequirements.initSystems (allowlist), QuizOption.preferInit ("systemd"|"non-systemd" soft preference)
+   442→- MATCHING ENGINE: hard init filter; soft preferInit bonus (3.2 raw for non-systemd match, ×0.5 for systemd match); 3 dedicated init MatchReasons (systemdFreeHard/systemdFreeSoft/systemdMainstream) injected via extras param in buildReasons; verified: must-avoid → Gentoo/Guix/Artix/Void all non-systemd w/ "systemd-free, guaranteed" reason; soft prefer → MX 99/Artix 96/Devuan 94
+   443→- DATASET (42→52 distros): initSystem codemod (scripts/add-init.ts, deleted after use) tagged all 42 (34 systemd, OpenRC: gentoo+alpine, SysVinit: mx/antix/slackware, runit: void, other: puppy/tiny-core); appended 10 new distros w/ full 17-trait scores: Artix (OpenRC, Arch fam), Devuan (SysVinit, Debian), Guix System (shepherd, Independent, declarative), BigLinux (Manjaro-based KDE showpiece), PCLinuxOS (independent GUI-first), LMDE (Mint-on-Debian), SteamOS (immutable gaming, Arch fam), Trisquel (FSF-endorsed, free-software tag), Q4OS (Trinity, 512MB RAM revival), Ubuntu Budgie; PureOS +="free-software" tag; USE_CASE_LABELS +="free-software"; OS_SIMILARITY extended (windows:+pclinuxos+biglinux, macos:+ubuntu-budgie, chromeos:+q4os)
+   444→- QUIZ (11→16 questions, APPENDED at end — positional URL codec (?q=) stays backward-compatible, verified old deep-links restore): appstore (GUI store/universal Flatpak/community repos/classic), init (dontknow/fine/prefer-alt/must-avoid w/ hard initSystems filter), immutable (must w/ tags:["immutable"]/nice/control/neverheard), foss (works/mostly-free/strict w/ tags:["free-software"]), dualboot (windows/maybe-later/linux-only/from-macos); adventure "why" reworded (no longer "final calibration")
+   445→- BEGINNER PACK (user-requested repo recommendation): src/data/beginner-pack.ts (repo URL/owner, 5 first steps w/ icons+time+commands, 15 starter apps w/ Flatpak IDs from the repo, 3 truth chips); src/components/beginner-pack.tsx — new section id="beginner-kit" (eyebrow 03, amber tone): interactive 5-step checklist w/ localStorage persistence via useSyncExternalStore (hydration-safe, React-Compiler clean; custom event distrscope:beginner-steps-changed), amber→emerald progress bar + "N of 5 done", 12-app grid (click = copy Flatpak ID → toast) + "three unsung heroes" strip (Flatseal/Warehouse/Timeshift, emerald), GitHub CTA card w/ attribution @yofriendfromschool1
+   446→- WIRING: page.tsx (BeginnerPack after QuizSection w/ divider); navbar +="Beginner Kit" link; command palette +="Open the beginner day-one kit" entry; quiz results conditional beginner card (isBeginner = experience none/dabbled OR appstore visual) w/ repo link + #beginner-kit anchor + 4-step preview chips
+   447→- UI INIT EXPOSURE: distro-dialog +="Init system" Stat + "Init note" card (amber dot for non-systemd); compare-dialog +="Init" row (amber text for non-systemd, title=initNote); distro-table +="Init" sortable column (xl:table-cell, in Everything preset); graph-explorer +="Init system" FilterGroup (dynamic chips w/ counts, systemd first, amber labels for alternatives)
+   448→- COPY/COUNTS made dynamic everywhere: hero personas + HERO_STATS, palette placeholder + quiz hint, quiz-section (16 questions/ranks all 52/We score all 52/analyzing msg), footer, share-card DATASET_TAG, markdown-export, json-export dataset card, api/og chips, layout.tsx OG alt
+   449→
+   450→Bugs found & fixed this round:
+   451→1. React Compiler lint: setState-in-effect for checklist hydration → rewrote as useSyncExternalStore + cached snapshot + custom event (getServerSnapshot → empty set, no hydration mismatch)
+   452→2. CRITICAL layout bug: lg:grid-cols-[5fr,7fr] (comma) silently NOT generated by Tailwind 4 → single column at desktop; codebase convention is underscores → lg:grid-cols-[5fr_7fr] fixed (computed style now 500px/700px)
+   453→3. quiz copy "Eleven questions" + api/og chips + layout alt still hardcoded → all made dynamic
+   454→4. VLM false alarm triage: "1 Issue" badge in screenshot = Next.js dev overlay counting PRE-EXISTING mobile-viewport hydration warning (Navbar Sheet radix aria-controls ID mismatch from use-mobile SSR divergence) — verified pre-existing via git-stash A/B test (occurs on old code identically at 390px); cosmetic/dev-only, all interactions unaffected
+   455→
+   456→Verification (agent-browser DOM/computed-style + curl + VLM):
+   457→- Beginner kit: 5 steps render, click → aria-pressed + localStorage saved (["update"]) + "1 of 5 done"; persistence across reload ✓; Flatpak ID click → toast "Flatpak ID copied" ✓; repo link → github.com/yofriendfromschool1/Beginner-Linux-Apps ✓; navbar link ✓; two-column 500/700px desktop ✓; mobile 358px single col, no h-scroll, Reset hidden at 0 checked ✓
+   458→- Quiz E2E (16 Qs, beginner profile: everyday laptop/first-time/avoid terminal/browsing/ootb/windows-like/…/visual app store/init?-what/immutable?/whatever/alongside Windows): Linux Mint 99% top, LMDE 96% #2, beginner card with both links rendered, ?q= deep-link → reload restores results + card ✓
+   459→- API: systemd-free answers → Gentoo 99/Guix 95/Artix 94/Void 91, all non-systemd true; immutable must → SteamOS/Bazzite/Vanilla OS; foss strict → Trisquel + PureOS; beginner flow → Mint/LMDE/Zorin ✓
+   460→- Table: 52 rows, Artix row w/ "OpenRC" init cell ✓; compare dialog "Init" row renders (SysVinit vs systemd) ✓; Artix dialog: Init system=OpenRC + initNote "choice of OpenRC, runit…" ✓
+   461→- Graph: OpenRC filter → exactly 3 bubbles (Artix/Gentoo/Alpine) ✓; reset works ✓
+   462→- OG images: generic 115KB + match 135KB, both 1200×630 PNG ✓
+   463→- Mobile 390px full-scroll: no h-scroll, page 9941px; desktop 1440 full-scroll: atBottom, no h-scroll, no non-hydration errors; lint 0 errors; tsc 0 src errors; dev.log all 200s
+   464→
+   465→Stage Summary:
+   466→- Features: init-system dimension end-to-end (data + quiz + engine + filters/dialog/table/compare), 10 new distros (52 total), 5 new questions (16 total, backward-compatible deep-links), immutable + FOSS-purity + app-store + dual-boot matching, Beginner day-one kit section w/ persistent interactive checklist + Flatpak-ID copy + GitHub repo CTA, contextual beginner card in quiz results, dynamic dataset counts everywhere
+   467→- Styling: amber/emerald kit theme w/ timeline connector line, checkable step cards w/ strike-through on done, per-app hover lift + mono Flatpak IDs, amber-tinted init indicators across dialog/table/compare/filters, gradient CTA card
+   468→- Known items: pre-existing mobile-viewport hydration warning (Navbar Sheet radix ID, dev-only cosmetic — candidate fix: render Sheet only after mount or suppressHydrationWarning); z-ai SDK token still missing (oracle degrades gracefully)
+   469→- Next-round ideas: i18n, fix the use-mobile hydration warning properly, distro-dialog "add to compare" button, quiz profile radar in table rows, "most compared" og cards, a11y focus-order audit, maybe more distro additions (RebornOS/blendOS/Nitrux) or an ARM/phone category
+   470→

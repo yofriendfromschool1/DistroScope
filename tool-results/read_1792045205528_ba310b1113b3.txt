@@ -1,0 +1,1243 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useId, useRef, useState } from "react";
+     4→import { AnimatePresence, motion, type Variants } from "framer-motion";
+     5→import {
+     6→  ArrowRight,
+     7→  Bot,
+     8→  Check,
+     9→  ChevronDown,
+    10→  ChevronLeft,
+    11→  ExternalLink,
+    12→  GitCompare,
+    13→  Info,
+    14→  ListChecks,
+    15→  MapPinned,
+    16→  MousePointerClick,
+    17→  PenLine,
+    18→  RotateCcw,
+    19→  Share2,
+    20→  Sparkles,
+    21→  Telescope,
+    22→  ThumbsDown,
+    23→  ThumbsUp,
+    24→  Trophy,
+    25→} from "lucide-react";
+    26→import { Button } from "@/components/ui/button";
+    27→import {
+    28→  Tooltip,
+    29→  TooltipContent,
+    30→  TooltipProvider,
+    31→  TooltipTrigger,
+    32→} from "@/components/ui/tooltip";
+    33→import { DistroIcon } from "@/components/icon";
+    34→import { DistroDialog } from "@/components/distro-dialog";
+    35→import { QUIZ_QUESTIONS } from "@/data/questions";
+    36→import { useDistroScope } from "@/lib/store";
+    37→import { buildShareUrl, decodeQuizAnswers, encodeQuizAnswers } from "@/lib/quiz-url";
+    38→import type {
+    39→  Distro,
+    40→  DistroMatch,
+    41→  MatchResponse,
+    42→  QuizAnswers,
+    43→  QuizQuestion,
+    44→} from "@/lib/types";
+    45→import { cn } from "@/lib/utils";
+    46→import { useToast } from "@/hooks/use-toast";
+    47→
+    48→type Phase = "intro" | "quiz" | "analyzing" | "results";
+    49→
+    50→const ANALYZING_MESSAGES = [
+    51→  "Scanning 42 distros...",
+    52→  "Consulting the Arch wiki...",
+    53→  "Weighing your priorities...",
+    54→  "Measuring RAM footprints...",
+    55→  "Cross-checking family trees...",
+    56→  "Almost there...",
+    57→];
+    58→
+    59→const DIFFICULTY_LABELS = [
+    60→  "Absolute beginner",
+    61→  "Beginner",
+    62→  "Intermediate",
+    63→  "Advanced",
+    64→  "Expert",
+    65→];
+    66→
+    67→const slide: Variants = {
+    68→  enter: (dir: number) => ({ opacity: 0, x: dir * 48 }),
+    69→  center: { opacity: 1, x: 0 },
+    70→  exit: (dir: number) => ({ opacity: 0, x: dir * -48 }),
+    71→};
+    72→
+    73→function MatchRing({
+    74→  value,
+    75→  size = 96,
+    76→  label,
+    77→}: {
+    78→  value: number;
+    79→  size?: number;
+    80→  label?: string;
+    81→}) {
+    82→  const gradId = useId();
+    83→  const r = (size - 12) / 2;
+    84→  const c = 2 * Math.PI * r;
+    85→  return (
+    86→    <div
+    87→      className="relative shrink-0"
+    88→      style={{ width: size, height: size }}
+    89→      role="img"
+    90→      aria-label={`${value} percent match${label ? ` for ${label}` : ""}`}
+    91→    >
+    92→      <svg width={size} height={size} className="-rotate-90">
+    93→        <defs>
+    94→          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+    95→            <stop offset="0%" stopColor="#a78bfa" />
+    96→            <stop offset="100%" stopColor="#e879f9" />
+    97→          </linearGradient>
+    98→        </defs>
+    99→        <circle
+   100→          cx={size / 2}
+   101→          cy={size / 2}
+   102→          r={r}
+   103→          fill="none"
+   104→          stroke="rgba(255,255,255,0.08)"
+   105→          strokeWidth={7}
+   106→        />
+   107→        <motion.circle
+   108→          cx={size / 2}
+   109→          cy={size / 2}
+   110→          r={r}
+   111→          fill="none"
+   112→          stroke={`url(#${gradId})`}
+   113→          strokeWidth={7}
+   114→          strokeLinecap="round"
+   115→          strokeDasharray={c}
+   116→          initial={{ strokeDashoffset: c }}
+   117→          animate={{ strokeDashoffset: c - (c * value) / 100 }}
+   118→          transition={{ duration: 1.3, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+   119→          style={{
+   120→            filter: "drop-shadow(0 0 6px rgba(232,121,249,0.45))",
+   121→          }}
+   122→        />
+   123→      </svg>
+   124→      <div className="absolute inset-0 flex flex-col items-center justify-center">
+   125→        <span
+   126→          className="font-mono font-bold leading-none"
+   127→          style={{ fontSize: size / 4 }}
+   128→        >
+   129→          {value}
+   130→          <span className="text-[0.6em]">%</span>
+   131→        </span>
+   132→        {label && (
+   133→          <span className="mt-1 max-w-full truncate text-[9px] uppercase tracking-wider text-muted-foreground">
+   134→            {label}
+   135→          </span>
+   136→        )}
+   137→      </div>
+   138→    </div>
+   139→  );
+   140→}
+   141→
+   142→export function QuizSection() {
+   143→  const [phase, setPhase] = useState<Phase>("intro");
+   144→  const [index, setIndex] = useState(0);
+   145→  const [direction, setDirection] = useState(1);
+   146→  const [answers, setAnswers] = useState<QuizAnswers>({});
+   147→  const [result, setResult] = useState<MatchResponse | null>(null);
+   148→  const [analyzingMsg, setAnalyzingMsg] = useState(0);
+   149→  const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
+   150→  const [selectedDistro, setSelectedDistro] = useState<Distro | null>(null);
+   151→  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+   152→  const [aiLoading, setAiLoading] = useState(false);
+   153→  const [aiFailed, setAiFailed] = useState(false);
+   154→  const [answersOpen, setAnswersOpen] = useState(false);
+   155→  const advancing = useRef(false);
+   156→  const restoredRef = useRef(false);
+   157→  const { toast } = useToast();
+   158→
+   159→  const setHighlight = useDistroScope((s) => s.setHighlight);
+   160→  const compare = useDistroScope((s) => s.compare);
+   161→  const toggleCompare = useDistroScope((s) => s.toggleCompare);
+   162→
+   163→  const question: QuizQuestion | undefined = QUIZ_QUESTIONS[index];
+   164→  const matches = result?.matches ?? [];
+   165→  const top = matches[0];
+   166→  const selectedIds = question ? (answers[question.id] ?? []) : [];
+   167→
+   168→  const analyze = useCallback(
+   169→    async (finalAnswers: QuizAnswers) => {
+   170→      setPhase("analyzing");
+   171→      setAnalyzingMsg(0);
+   172→      try {
+   173→        const [res] = await Promise.all([
+   174→          fetch("/api/match", {
+   175→            method: "POST",
+   176→            headers: { "Content-Type": "application/json" },
+   177→            body: JSON.stringify({ answers: finalAnswers }),
+   178→          }),
+   179→          new Promise((r) => setTimeout(r, 1900)),
+   180→        ]);
+   181→        if (!res.ok) throw new Error("match failed");
+   182→        const data = (await res.json()) as MatchResponse;
+   183→        setResult(data);
+   184→        setFeedbackGiven(null);
+   185→        setAiExplanation(null);
+   186→        setAiFailed(false);
+   187→        setPhase("results");
+   188→        // deep-link: make this result shareable via ?q=<code>
+   189→        try {
+   190→          const code = encodeQuizAnswers(finalAnswers);
+   191→          window.history.replaceState(
+   192→            null,
+   193→            "",
+   194→            `${window.location.pathname}?q=${code}#finder`
+   195→          );
+   196→        } catch {
+   197→          // non-critical
+   198→        }
+   199→        window.dispatchEvent(new Event("distroscope:quiz-done"));
+   200→      } catch {
+   201→        toast({
+   202→          title: "Something went wrong",
+   203→          description: "Could not score your answers. Let's try that again.",
+   204→          variant: "destructive",
+   205→        });
+   206→        setPhase("quiz");
+   207→      }
+   208→    },
+   209→    [toast]
+   210→  );
+   211→
+   212→  // restore a shared result from ?q=<code> deep-link
+   213→  useEffect(() => {
+   214→    if (restoredRef.current) return;
+   215→    const code = new URLSearchParams(window.location.search).get("q");
+   216→    if (!code) return;
+   217→    const restored = decodeQuizAnswers(code);
+   218→    if (!restored) return;
+   219→    restoredRef.current = true;
+   220→    setAnswers(restored);
+   221→    analyze(restored);
+   222→  }, [analyze]);
+   223→
+   224→  const advance = useCallback(() => {
+   225→    if (advancing.current) return;
+   226→    advancing.current = true;
+   227→    setDirection(1);
+   228→    if (index < QUIZ_QUESTIONS.length - 1) {
+   229→      setIndex((i) => i + 1);
+   230→      setTimeout(() => (advancing.current = false), 220);
+   231→    } else {
+   232→      analyze(answers);
+   233→      advancing.current = false;
+   234→    }
+   235→  }, [index, answers, analyze]);
+   236→
+   237→  const goBack = useCallback(() => {
+   238→    if (index === 0) return;
+   239→    setDirection(-1);
+   240→    setIndex((i) => i - 1);
+   241→  }, [index]);
+   242→
+   243→  // jump back to a question from the results "your answers" panel —
+   244→  // continuing through to the end re-analyzes with the updated answers
+   245→  const editAnswer = useCallback(
+   246→    (qIndex: number) => {
+   247→      setDirection(qIndex < index ? -1 : 1);
+   248→      setIndex(qIndex);
+   249→      setPhase("quiz");
+   250→    },
+   251→    [index]
+   252→  );
+   253→
+   254→  const selectOption = useCallback(
+   255→    (q: QuizQuestion, optionId: string) => {
+   256→      if (q.type === "single") {
+   257→        setAnswers((a) => ({ ...a, [q.id]: [optionId] }));
+   258→        setTimeout(() => advance(), 240);
+   259→      } else {
+   260→        setAnswers((a) => {
+   261→          const current = a[q.id] ?? [];
+   262→          const next = current.includes(optionId)
+   263→            ? current.filter((x) => x !== optionId)
+   264→            : current.length >= 3
+   265→              ? current
+   266→              : [...current, optionId];
+   267→          return { ...a, [q.id]: next };
+   268→        });
+   269→      }
+   270→    },
+   271→    [advance]
+   272→  );
+   273→
+   274→  // rotating analyzing messages
+   275→  useEffect(() => {
+   276→    if (phase !== "analyzing") return;
+   277→    const t = setInterval(
+   278→      () =>
+   279→        setAnalyzingMsg(
+   280→          (m) => (m + 1) % ANALYZING_MESSAGES.length
+   281→        ),
+   282→      560
+   283→    );
+   284→    return () => clearInterval(t);
+   285→  }, [phase]);
+   286→
+   287→  // keyboard navigation
+   288→  useEffect(() => {
+   289→    if (phase !== "quiz" || !question) return;
+   290→    const handler = (e: KeyboardEvent) => {
+   291→      if (e.target instanceof HTMLInputElement) return;
+   292→      if (/^[1-9]$/.test(e.key)) {
+   293→        const opt = question.options[parseInt(e.key, 10) - 1];
+   294→        if (opt) {
+   295→          e.preventDefault();
+   296→          selectOption(question, opt.id);
+   297→        }
+   298→      } else if (e.key === "Enter" && question.type === "multi") {
+   299→        if ((answers[question.id] ?? []).length > 0) {
+   300→          e.preventDefault();
+   301→          advance();
+   302→        }
+   303→      } else if (e.key === "ArrowLeft" && index > 0) {
+   304→        e.preventDefault();
+   305→        goBack();
+   306→      }
+   307→    };
+   308→    window.addEventListener("keydown", handler);
+   309→    return () => window.removeEventListener("keydown", handler);
+   310→  }, [phase, question, answers, index, selectOption, advance, goBack]);
+   311→
+   312→  const retake = () => {
+   313→    setAnswers({});
+   314→    setResult(null);
+   315→    setIndex(0);
+   316→    setDirection(1);
+   317→    setAiExplanation(null);
+   318→    setAiFailed(false);
+   319→    setPhase("intro");
+   320→    // clear the deep-link param so a fresh quiz isn't shadowed by the old one
+   321→    try {
+   322→      window.history.replaceState(
+   323→        null,
+   324→        "",
+   325→        `${window.location.pathname}#finder`
+   326→      );
+   327→    } catch {
+   328→      // non-critical
+   329→    }
+   330→  };
+   331→
+   332→  const viewOnGraph = () => {
+   333→    setHighlight(matches.map((m) => m.distro.id));
+   334→    document
+   335→      .getElementById("explore")
+   336→      ?.scrollIntoView({ behavior: "smooth" });
+   337→    toast({
+   338→      title: "Matches highlighted on the map",
+   339→      description: "Scroll over the bubbles glowing to compare.",
+   340→    });
+   341→  };
+   342→
+   343→  const share = async () => {
+   344→    if (!top) return;
+   345→    const link = buildShareUrl(answers);
+   346→    const lines = [
+   347→      `DistroScope says my perfect Linux is ${top.distro.name} (${top.score}%)`,
+   348→      ...matches
+   349→        .slice(1, 3)
+   350→        .map((m) => `· ${m.distro.name} (${m.score}%)`),
+   351→      `See why — or find yours: ${link}`,
+   352→    ];
+   353→    try {
+   354→      await navigator.clipboard.writeText(lines.join("\n"));
+   355→      toast({
+   356→        title: "Shareable link copied",
+   357→        description:
+   358→          "Anyone opening it lands straight on these results — answers included.",
+   359→      });
+   360→    } catch {
+   361→      toast({ title: "Could not copy", variant: "destructive" });
+   362→    }
+   363→  };
+   364→
+   365→  const askOracle = async () => {
+   366→    if (aiLoading || aiExplanation) return;
+   367→    setAiLoading(true);
+   368→    setAiFailed(false);
+   369→    try {
+   370→      const res = await fetch("/api/explain", {
+   371→        method: "POST",
+   372→        headers: { "Content-Type": "application/json" },
+   373→        body: JSON.stringify({ answers }),
+   374→      });
+   375→      if (!res.ok) throw new Error("explain failed");
+   376→      const data = (await res.json()) as { explanation: string };
+   377→      setAiExplanation(data.explanation);
+   378→    } catch {
+   379→      setAiFailed(true);
+   380→      toast({
+   381→        title: "The oracle is silent",
+   382→        description: "AI explanation is unavailable — the match reasons still stand.",
+   383→        variant: "destructive",
+   384→      });
+   385→    } finally {
+   386→      setAiLoading(false);
+   387→    }
+   388→  };
+   389→
+   390→  const sendFeedback = async (helpful: boolean) => {
+   391→    if (!top) return;
+   392→    setFeedbackGiven(helpful ? "up" : "down");
+   393→    try {
+   394→      await fetch("/api/feedback", {
+   395→        method: "POST",
+   396→        headers: { "Content-Type": "application/json" },
+   397→        body: JSON.stringify({ distroName: top.distro.name, helpful }),
+   398→      });
+   399→      window.dispatchEvent(new Event("distroscope:feedback-given"));
+   400→    } catch {
+   401→      // non-critical
+   402→    }
+   403→  };
+   404→
+   405→  return (
+   406→    <section
+   407→      id="finder"
+   408→      className="relative mx-auto w-full max-w-7xl scroll-mt-24 px-4 py-16 sm:px-6 sm:py-20"
+   409→    >
+   410→      <header className="mx-auto max-w-2xl text-center">
+   411→        <div className="glass-soft inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium text-muted-foreground">
+   412→          <ListChecks className="size-3.5 text-fuchsia-300" />
+   413→          Distro finder
+   414→        </div>
+   415→        <h2 className="mt-4 text-balance text-3xl font-bold tracking-tight sm:text-4xl">
+   416→          Eleven questions between you and{" "}
+   417→          <span className="text-gradient">your distro</span>
+   418→        </h2>
+   419→        <p className="mt-3 text-pretty leading-relaxed text-muted-foreground">
+   420→          Device, experience, priorities, quirks — the quiz listens to all of
+   421→          it and ranks all 42 distros for you.
+   422→        </p>
+   423→      </header>
+   424→
+   425→      <div className="mx-auto mt-10 max-w-3xl">
+   426→        <AnimatePresence mode="wait">
+   427→          {/* ── Intro ── */}
+   428→          {phase === "intro" && (
+   429→            <motion.div
+   430→              key="intro"
+   431→              initial={{ opacity: 0, y: 24 }}
+   432→              animate={{ opacity: 1, y: 0 }}
+   433→              exit={{ opacity: 0, y: -16 }}
+   434→              transition={{ duration: 0.45 }}
+   435→              className="glass relative overflow-hidden rounded-3xl p-7 sm:p-9"
+   436→            >
+   437→              <div className="pointer-events-none absolute -right-20 -top-20 size-56 rounded-full bg-violet-500/15 blur-[70px]" />
+   438→              <div className="pointer-events-none absolute -bottom-24 -left-16 size-56 rounded-full bg-fuchsia-500/10 blur-[70px]" />
+   439→
+   440→              <div className="relative flex flex-col items-center text-center">
+   441→                <span className="grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400 shadow-[0_0_36px_rgb(192_132_252/0.4)]">
+   442→                  <Telescope className="size-7 text-white" />
+   443→                </span>
+   444→                <h3 className="mt-5 text-2xl font-bold tracking-tight">
+   445→                  Ready to meet your distro?
+   446→                </h3>
+   447→                <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+   448→                  Eleven questions, roughly two minutes, zero wrong answers.
+   449→                  Your answers stay on this machine — we only count the
+   450→                  result, anonymously.
+   451→                </p>
+   452→
+   453→                <div className="mt-7 grid w-full gap-3 sm:grid-cols-3">
+   454→                  {[
+   455→                    {
+   456→                      icon: MousePointerClick,
+   457→                      title: "Answer honestly",
+   458→                      text: "Device, habits, quirks — details matter",
+   459→                    },
+   460→                    {
+   461→                      icon: Sparkles,
+   462→                      title: "We score all 42",
+   463→                      text: "17 weighted traits per distro",
+   464→                    },
+   465→                    {
+   466→                      icon: Trophy,
+   467→                      title: "Meet your match",
+   468→                      text: "Ranked results with real reasons",
+   469→                    },
+   470→                  ].map((step, i) => (
+   471→                    <div
+   472→                      key={step.title}
+   473→                      className="glass-soft rounded-2xl p-4 text-left"
+   474→                    >
+   475→                      <div className="flex items-center gap-2">
+   476→                        <step.icon className="size-4 text-fuchsia-300" />
+   477→                        <p className="text-[13px] font-semibold">
+   478→                          {i + 1}. {step.title}
+   479→                        </p>
+   480→                      </div>
+   481→                      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+   482→                        {step.text}
+   483→                      </p>
+   484→                    </div>
+   485→                  ))}
+   486→                </div>
+   487→
+   488→                <Button
+   489→                  onClick={() => setPhase("quiz")}
+   490→                  className="mt-8 h-12 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-7 text-[15px] font-medium shadow-[0_10px_36px_rgb(192_132_252/0.4)] hover:brightness-110 hover:shadow-[0_10px_44px_rgb(192_132_252/0.6)]"
+   491→                >
+   492→                  <Sparkles className="size-4" />
+   493→                  Start the quiz
+   494→                </Button>
+   495→                <p className="mt-3 font-mono text-[11px] text-muted-foreground/70">
+   496→                  tip: keys 1–9 pick options · ← goes back
+   497→                </p>
+   498→              </div>
+   499→            </motion.div>
+   500→          )}
+   501→
+   502→          {/* ── Quiz ── */}
+   503→          {phase === "quiz" && question && (
+   504→            <motion.div
+   505→              key="quiz"
+   506→              initial={{ opacity: 0 }}
+   507→              animate={{ opacity: 1 }}
+   508→              exit={{ opacity: 0 }}
+   509→              className="glass relative overflow-hidden rounded-3xl p-5 sm:p-8"
+   510→            >
+   511→              {/* progress */}
+   512→              <div className="flex items-center justify-between gap-4">
+   513→                <button
+   514→                  type="button"
+   515→                  onClick={goBack}
+   516→                  disabled={index === 0}
+   517→                  className={cn(
+   518→                    "glass-soft flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all",
+   519→                    index === 0
+   520→                      ? "pointer-events-none opacity-30"
+   521→                      : "hover:bg-white/10 hover:text-foreground"
+   522→                  )}
+   523→                >
+   524→                  <ChevronLeft className="size-3.5" />
+   525→                  Back
+   526→                </button>
+   527→                <div className="flex flex-1 gap-1 px-2" aria-hidden>
+   528→                  {QUIZ_QUESTIONS.map((q, i) => (
+   529→                    <div
+   530→                      key={q.id}
+   531→                      className={cn(
+   532→                        "h-1 flex-1 rounded-full transition-colors duration-300",
+   533→                        i < index
+   534→                          ? "bg-fuchsia-400/60"
+   535→                          : i === index
+   536→                            ? "bg-gradient-to-r from-violet-400 to-fuchsia-400"
+   537→                            : "bg-white/[0.08]"
+   538→                      )}
+   539→                    />
+   540→                  ))}
+   541→                </div>
+   542→                <p className="shrink-0 font-mono text-xs text-muted-foreground">
+   543→                  {index + 1}/{QUIZ_QUESTIONS.length}
+   544→                </p>
+   545→              </div>
+   546→
+   547→              {/* question */}
+   548→              <AnimatePresence mode="wait" custom={direction}>
+   549→                <motion.div
+   550→                  key={question.id}
+   551→                  custom={direction}
+   552→                  variants={slide}
+   553→                  initial="enter"
+   554→                  animate="center"
+   555→                  exit="exit"
+   556→                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+   557→                  className="mt-7"
+   558→                >
+   559→                  <div className="flex items-start gap-4">
+   560→                    <span className="glass-soft grid size-12 shrink-0 place-items-center rounded-2xl">
+   561→                      <DistroIcon
+   562→                        name={question.icon}
+   563→                        className="size-6 text-fuchsia-300"
+   564→                      />
+   565→                    </span>
+   566→                    <div className="min-w-0">
+   567→                      <h3 className="flex flex-wrap items-center gap-2 text-xl font-bold leading-snug tracking-tight sm:text-2xl">
+   568→                        <span className="text-balance">{question.title}</span>
+   569→                        {question.why && (
+   570→                          <TooltipProvider delayDuration={120}>
+   571→                            <Tooltip>
+   572→                              <TooltipTrigger asChild>
+   573→                                <button
+   574→                                  type="button"
+   575→                                  aria-label="Why we ask this"
+   576→                                  className="glass-soft group grid size-6 shrink-0 place-items-center rounded-full border-white/10 text-muted-foreground transition-all hover:border-fuchsia-300/40 hover:text-fuchsia-200"
+   577→                                >
+   578→                                  <Info className="size-3.5 transition-transform group-hover:scale-110" />
+   579→                                </button>
+   580→                              </TooltipTrigger>
+   581→                              <TooltipContent
+   582→                                side="top"
+   583→                                className="max-w-[290px] rounded-xl border-white/15 bg-popover/95 px-3.5 py-3 text-xs leading-relaxed text-foreground/90 shadow-[0_12px_40px_rgb(0_0_0/0.5)] backdrop-blur-xl"
+   584→                              >
+   585→                                <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-fuchsia-300">
+   586→                                  <Sparkles className="size-3" />
+   587→                                  Why we ask
+   588→                                </p>
+   589→                                {question.why}
+   590→                              </TooltipContent>
+   591→                            </Tooltip>
+   592→                          </TooltipProvider>
+   593→                        )}
+   594→                      </h3>
+   595→                      {question.subtitle && (
+   596→                        <p className="mt-1 text-sm text-muted-foreground">
+   597→                          {question.subtitle}
+   598→                        </p>
+   599→                      )}
+   600→                    </div>
+   601→                  </div>
+   602→
+   603→                  <div
+   604→                    className={cn(
+   605→                      "mt-6 grid gap-2.5",
+   606→                      question.options.length > 5
+   607→                        ? "sm:grid-cols-2"
+   608→                        : "sm:grid-cols-2"
+   609→                    )}
+   610→                  >
+   611→                    {question.options.map((opt, i) => {
+   612→                      const selected = selectedIds.includes(opt.id);
+   613→                      return (
+   614→                        <button
+   615→                          key={opt.id}
+   616→                          type="button"
+   617→                          onClick={() => selectOption(question, opt.id)}
+   618→                          aria-pressed={selected}
+   619→                          className={cn(
+   620→                            "group relative flex w-full items-start gap-3.5 overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200",
+   621→                            selected
+   622→                              ? "border-fuchsia-300/50 bg-fuchsia-400/10 shadow-[0_0_28px_rgb(232_121_249/0.14)]"
+   623→                              : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.07]"
+   624→                          )}
+   625→                        >
+   626→                          {selected && (
+   627→                            <motion.span
+   628→                              layoutId={`accent-${question.id}`}
+   629→                              className="absolute inset-y-2 left-0 w-1 rounded-full bg-gradient-to-b from-violet-400 to-fuchsia-400"
+   630→                            />
+   631→                          )}
+   632→                          <span
+   633→                            className={cn(
+   634→                              "glass-soft grid size-9 shrink-0 place-items-center rounded-xl transition-colors",
+   635→                              selected && "border-fuchsia-300/30"
+   636→                            )}
+   637→                          >
+   638→                            <DistroIcon
+   639→                              name={opt.icon}
+   640→                              className={cn(
+   641→                                "size-4.5 transition-colors",
+   642→                                selected
+   643→                                  ? "text-fuchsia-200"
+   644→                                  : "text-muted-foreground group-hover:text-foreground"
+   645→                              )}
+   646→                            />
+   647→                          </span>
+   648→                          <span className="min-w-0 flex-1">
+   649→                            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+   650→                              <span
+   651→                                className={cn(
+   652→                                  "text-[15px] font-semibold leading-snug",
+   653→                                  selected && "text-fuchsia-100"
+   654→                                )}
+   655→                              >
+   656→                                {opt.label}
+   657→                              </span>
+   658→                            </span>
+   659→                            {opt.hint && (
+   660→                              <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+   661→                                {opt.hint}
+   662→                              </span>
+   663→                            )}
+   664→                          </span>
+   665→                          <span className="flex shrink-0 flex-col items-end gap-1.5">
+   666→                            <kbd className="hidden rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/60 sm:block">
+   667→                              {i + 1}
+   668→                            </kbd>
+   669→                            {question.type === "multi" && (
+   670→                              <span
+   671→                                className={cn(
+   672→                                  "grid size-5 place-items-center rounded-full border transition-all",
+   673→                                  selected
+   674→                                    ? "border-fuchsia-300/60 bg-fuchsia-400/25"
+   675→                                    : "border-white/15 bg-transparent"
+   676→                                )}
+   677→                              >
+   678→                                {selected && (
+   679→                                  <Check className="size-3 text-fuchsia-100" />
+   680→                                )}
+   681→                              </span>
+   682→                            )}
+   683→                          </span>
+   684→                        </button>
+   685→                      );
+   686→                    })}
+   687→                  </div>
+   688→
+   689→                  {/* multi footer */}
+   690→                  {question.type === "multi" && (
+   691→                    <div className="mt-5 flex min-h-11 items-center justify-between gap-3">
+   692→                      <p className="text-xs text-muted-foreground">
+   693→                        {selectedIds.length === 0
+   694→                          ? question.id === "usecase"
+   695→                            ? "Pick one to three"
+   696→                            : "Pick all that apply"
+   697→                          : `${selectedIds.length} selected${
+   698→                              selectedIds.length >= 3 ? " — that's the max" : ""
+   699→                            }`}
+   700→                      </p>
+   701→                      <AnimatePresence>
+   702→                        {selectedIds.length > 0 && (
+   703→                          <motion.div
+   704→                            initial={{ opacity: 0, y: 8 }}
+   705→                            animate={{ opacity: 1, y: 0 }}
+   706→                            exit={{ opacity: 0, y: 8 }}
+   707→                          >
+   708→                            <Button
+   709→                              onClick={advance}
+   710→                              className="h-10 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 text-sm font-medium shadow-[0_6px_24px_rgb(192_132_252/0.35)] hover:brightness-110"
+   711→                            >
+   712→                              {index === QUIZ_QUESTIONS.length - 1
+   713→                                ? "See my results"
+   714→                                : "Continue"}
+   715→                              <ArrowRight className="size-4" />
+   716→                            </Button>
+   717→                          </motion.div>
+   718→                        )}
+   719→                      </AnimatePresence>
+   720→                    </div>
+   721→                  )}
+   722→                </motion.div>
+   723→              </AnimatePresence>
+   724→            </motion.div>
+   725→          )}
+   726→
+   727→          {/* ── Analyzing ── */}
+   728→          {phase === "analyzing" && (
+   729→            <motion.div
+   730→              key="analyzing"
+   731→              initial={{ opacity: 0 }}
+   732→              animate={{ opacity: 1 }}
+   733→              exit={{ opacity: 0 }}
+   734→              className="glass relative flex min-h-[380px] flex-col items-center justify-center overflow-hidden rounded-3xl p-8"
+   735→            >
+   736→              <div className="pointer-events-none absolute inset-0 bg-grid opacity-60 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
+   737→              <div className="relative">
+   738→                <div className="size-24 animate-spin-slow rounded-full border-2 border-violet-400/20 border-t-fuchsia-400" />
+   739→                <div className="absolute inset-0 grid place-items-center">
+   740→                  <Telescope className="size-8 text-fuchsia-300" />
+   741→                </div>
+   742→              </div>
+   743→              <div className="relative mt-7 h-6 overflow-hidden">
+   744→                <AnimatePresence mode="wait">
+   745→                  <motion.p
+   746→                    key={analyzingMsg}
+   747→                    initial={{ opacity: 0, y: 10 }}
+   748→                    animate={{ opacity: 1, y: 0 }}
+   749→                    exit={{ opacity: 0, y: -10 }}
+   750→                    transition={{ duration: 0.22 }}
+   751→                    className="font-mono text-sm text-muted-foreground"
+   752→                  >
+   753→                    {ANALYZING_MESSAGES[analyzingMsg]}
+   754→                  </motion.p>
+   755→                </AnimatePresence>
+   756→              </div>
+   757→              <div className="relative mt-4 h-1 w-56 overflow-hidden rounded-full bg-white/5">
+   758→                <div className="shimmer-line h-full w-full" />
+   759→              </div>
+   760→            </motion.div>
+   761→          )}
+   762→
+   763→          {/* ── Results ── */}
+   764→          {phase === "results" && top && (
+   765→            <motion.div
+   766→              key="results"
+   767→              initial={{ opacity: 0 }}
+   768→              animate={{ opacity: 1 }}
+   769→              className="flex flex-col"
+   770→            >
+   771→              {/* hero match */}
+   772→              <motion.div
+   773→                initial={{ opacity: 0, y: 24 }}
+   774→                animate={{ opacity: 1, y: 0 }}
+   775→                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+   776→                className="glass relative overflow-hidden rounded-3xl p-6 sm:p-8"
+   777→              >
+   778→                <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-fuchsia-500/15 blur-[80px]" />
+   779→                <div className="pointer-events-none absolute -bottom-28 -left-20 size-64 rounded-full bg-violet-500/10 blur-[80px]" />
+   780→
+   781→                <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center">
+   782→                  <MatchRing value={top.score} size={116} />
+   783→                  <div className="min-w-0">
+   784→                    <p className="text-xs font-semibold uppercase tracking-wider text-fuchsia-300">
+   785→                      Your perfect match
+   786→                    </p>
+   787→                    <h3 className="mt-1 text-3xl font-bold tracking-tight">
+   788→                      {top.distro.name}
+   789→                    </h3>
+   790→                    <p className="mt-1 text-pretty text-sm text-muted-foreground">
+   791→                      {top.distro.tagline}
+   792→                    </p>
+   793→                    <div className="mt-3 flex flex-wrap gap-1.5">
+   794→                      {[
+   795→                        top.distro.family,
+   796→                        DIFFICULTY_LABELS[top.distro.difficulty - 1],
+   797→                        top.distro.releaseModel === "rolling"
+   798→                          ? "Rolling release"
+   799→                          : "Point release",
+   800→                        `${top.distro.packageManager} packages`,
+   801→                      ].map((chip) => (
+   802→                        <span
+   803→                          key={chip}
+   804→                          className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+   805→                        >
+   806→                          {chip}
+   807→                        </span>
+   808→                      ))}
+   809→                    </div>
+   810→                  </div>
+   811→                </div>
+   812→
+   813→                <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
+   814→                  {top.reasons.map((reason) => (
+   815→                    <div key={reason.title} className="glass-soft rounded-2xl p-4">
+   816→                      <p className="flex items-center gap-2 text-[13px] font-semibold">
+   817→                        <Sparkles className="size-3.5 shrink-0 text-fuchsia-300" />
+   818→                        {reason.title}
+   819→                      </p>
+   820→                      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+   821→                        {reason.detail}
+   822→                      </p>
+   823→                    </div>
+   824→                  ))}
+   825→                </div>
+   826→
+   827→                {/* AI oracle */}
+   828→                <AnimatePresence>
+   829→                  {(aiLoading || aiExplanation || aiFailed) && (
+   830→                    <motion.div
+   831→                      key="oracle"
+   832→                      initial={{ opacity: 0, y: 12 }}
+   833→                      animate={{ opacity: 1, y: 0 }}
+   834→                      exit={{ opacity: 0, y: -8 }}
+   835→                      transition={{ duration: 0.35 }}
+   836→                      className="relative mt-4"
+   837→                    >
+   838→                      <div className="rounded-2xl border border-fuchsia-300/20 bg-gradient-to-br from-violet-500/[0.08] via-fuchsia-500/[0.06] to-transparent p-4 sm:p-5">
+   839→                        <div className="flex items-center gap-2.5">
+   840→                          <span className="relative grid size-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-500/70 to-fuchsia-500/70 shadow-[0_0_18px_rgb(232_121_249/0.35)]">
+   841→                            <Bot className="size-4.5 text-white" />
+   842→                            {aiLoading && (
+   843→                              <span className="absolute inset-0 animate-pulse-soft rounded-xl bg-fuchsia-400/20" />
+   844→                            )}
+   845→                          </span>
+   846→                          <p className="text-shimmer text-[13px] font-semibold tracking-wide">
+   847→                            {aiLoading
+   848→                              ? "Consulting the oracle…"
+   849→                              : "The oracle speaks"}
+   850→                          </p>
+   851→                          {aiLoading && (
+   852→                            <span className="ml-auto flex gap-1">
+   853→                              {[0, 1, 2].map((d) => (
+   854→                                <span
+   855→                                  key={d}
+   856→                                  className="size-1.5 animate-blink rounded-full bg-fuchsia-300"
+   857→                                  style={{ animationDelay: `${d * 0.22}s` }}
+   858→                                />
+   859→                              ))}
+   860→                            </span>
+   861→                          )}
+   862→                        </div>
+   863→
+   864→                        {aiLoading ? (
+   865→                          <div className="mt-3 space-y-2">
+   866→                            <div className="shimmer-line h-3 w-[92%] rounded-full" />
+   867→                            <div className="shimmer-line h-3 w-[78%] rounded-full" />
+   868→                            <div className="shimmer-line h-3 w-[85%] rounded-full" />
+   869→                          </div>
+   870→                        ) : aiExplanation ? (
+   871→                          <div className="mt-3 space-y-2.5">
+   872→                            {aiExplanation
+   873→                              .split(/\n{2,}|\n/)
+   874→                              .map((p) => p.trim())
+   875→                              .filter(Boolean)
+   876→                              .map((p, i) => (
+   877→                                <motion.p
+   878→                                  key={i}
+   879→                                  initial={{ opacity: 0 }}
+   880→                                  animate={{ opacity: 1 }}
+   881→                                  transition={{ delay: 0.15 + i * 0.25 }}
+   882→                                  className="text-pretty text-[13px] leading-relaxed text-foreground/85"
+   883→                                >
+   884→                                  {p}
+   885→                                </motion.p>
+   886→                              ))}
+   887→                          </div>
+   888→                        ) : (
+   889→                          <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+   890→                            The oracle went quiet, but the match reasons above
+   891→                            still tell the story.{" "}
+   892→                            <button
+   893→                              type="button"
+   894→                              onClick={() => {
+   895→                                setAiFailed(false);
+   896→                                void askOracle();
+   897→                              }}
+   898→                              className="font-medium text-fuchsia-300 underline decoration-fuchsia-300/40 underline-offset-2 transition-colors hover:text-fuchsia-200"
+   899→                            >
+   900→                              Try again
+   901→                            </button>
+   902→                          </p>
+   903→                        )}
+   904→                      </div>
+   905→                    </motion.div>
+   906→                  )}
+   907→                </AnimatePresence>
+   908→
+   909→                {!aiExplanation && !aiLoading && !aiFailed && (
+   910→                  <button
+   911→                    type="button"
+   912→                    onClick={() => void askOracle()}
+   913→                    className="group relative mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-fuchsia-300/25 bg-fuchsia-400/[0.04] px-4 py-3 text-[13px] font-medium text-fuchsia-200/90 transition-all duration-300 hover:border-fuchsia-300/50 hover:bg-fuchsia-400/10 hover:shadow-[0_0_24px_rgb(232_121_249/0.15)]"
+   914→                  >
+   915→                    <Bot className="size-4 transition-transform duration-300 group-hover:scale-110" />
+   916→                    Ask the AI oracle why {top.distro.name} fits you
+   917→                  </button>
+   918→                )}
+   919→
+   920→                <div className="relative mt-6 flex flex-wrap items-center gap-2.5">
+   921→                  <Button
+   922→                    asChild
+   923→                    className="h-10 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 text-[13px] font-medium shadow-[0_6px_24px_rgb(192_132_252/0.35)] hover:brightness-110"
+   924→                  >
+   925→                    <a
+   926→                      href={top.distro.website}
+   927→                      target="_blank"
+   928→                      rel="noopener noreferrer"
+   929→                    >
+   930→                      <ExternalLink className="size-4" />
+   931→                      Visit {top.distro.name}
+   932→                    </a>
+   933→                  </Button>
+   934→                  <Button
+   935→                    variant="outline"
+   936→                    onClick={() => toggleCompare(top.distro.id)}
+   937→                    className={cn(
+   938→                      "glass h-10 rounded-xl border-white/10 px-4 text-[13px] font-medium",
+   939→                      compare.includes(top.distro.id) &&
+   940→                        "border-fuchsia-300/40 bg-fuchsia-400/15 text-fuchsia-100"
+   941→                    )}
+   942→                  >
+   943→                    <GitCompare className="size-4" />
+   944→                    {compare.includes(top.distro.id)
+   945→                      ? "In compare tray"
+   946→                      : "Add to compare"}
+   947→                  </Button>
+   948→
+   949→                  <div className="ml-auto flex items-center gap-1.5">
+   950→                    {feedbackGiven ? (
+   951→                      <p className="px-2 text-xs text-muted-foreground">
+   952→                        Thanks — signal received
+   953→                      </p>
+   954→                    ) : (
+   955→                      <>
+   956→                        <span className="mr-1 text-xs text-muted-foreground">
+   957→                          Good match?
+   958→                        </span>
+   959→                        <button
+   960→                          type="button"
+   961→                          onClick={() => sendFeedback(true)}
+   962→                          className="glass-soft grid size-9 place-items-center rounded-xl border-white/15 text-foreground/80 transition-all hover:scale-105 hover:border-emerald-300/40 hover:text-emerald-300"
+   963→                          aria-label="Yes, good match"
+   964→                        >
+   965→                          <ThumbsUp className="size-4" />
+   966→                        </button>
+   967→                        <button
+   968→                          type="button"
+   969→                          onClick={() => sendFeedback(false)}
+   970→                          className="glass-soft grid size-9 place-items-center rounded-xl border-white/15 text-foreground/80 transition-all hover:scale-105 hover:border-rose-300/40 hover:text-rose-300"
+   971→                          aria-label="No, not for me"
+   972→                        >
+   973→                          <ThumbsDown className="size-4" />
+   974→                        </button>
+   975→                      </>
+   976→                    )}
+   977→                  </div>
+   978→                </div>
+   979→              </motion.div>
+   980→
+   981→              {/* runners-up */}
+   982→              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+   983→                {matches
+   984→                  .slice(1, 3)
+   985→                  .map(
+   986→                    (m: DistroMatch, i: number) =>
+   987→                      i < 2 && (
+   988→                        <motion.div
+   989→                          key={m.distro.id}
+   990→                          initial={{ opacity: 0, y: 24 }}
+   991→                          animate={{ opacity: 1, y: 0 }}
+   992→                          transition={{
+   993→                            duration: 0.5,
+   994→                            delay: 0.15 + i * 0.12,
+   995→                          }}
+   996→                          className="glass relative overflow-hidden rounded-3xl p-5 sm:p-6"
+   997→                        >
+   998→                          <div className="flex items-center gap-5">
+   999→                            <MatchRing value={m.score} size={72} />
+  1000→                            <div className="min-w-0 flex-1">
+  1001→                              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+  1002→                                Runner-up #{i + 1}
+  1003→                              </p>
+  1004→                              <p className="mt-0.5 truncate text-lg font-bold tracking-tight">
+  1005→                                {m.distro.name}
+  1006→                              </p>
+  1007→                              <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+  1008→                                {m.reasons[0]?.title ?? m.distro.tagline}
+  1009→                              </p>
+  1010→                            </div>
+  1011→                          </div>
+  1012→                          <div className="mt-4 flex items-center justify-between gap-2">
+  1013→                            <div className="flex flex-wrap gap-1.5">
+  1014→                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+  1015→                                {m.distro.family}
+  1016→                              </span>
+  1017→                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+  1018→                                {DIFFICULTY_LABELS[m.distro.difficulty - 1]}
+  1019→                              </span>
+  1020→                            </div>
+  1021→                            <div className="flex items-center gap-1">
+  1022→                              <button
+  1023→                                type="button"
+  1024→                                onClick={() => toggleCompare(m.distro.id)}
+  1025→                                className={cn(
+  1026→                                  "glass-soft grid size-8 place-items-center rounded-lg border-white/15 text-foreground/80 transition-all hover:text-foreground",
+  1027→                                  compare.includes(m.distro.id) &&
+  1028→                                    "border-fuchsia-300/40 text-fuchsia-200"
+  1029→                                )}
+  1030→                                aria-label={`Add ${m.distro.name} to compare`}
+  1031→                              >
+  1032→                                <GitCompare className="size-3.5" />
+  1033→                              </button>
+  1034→                              <a
+  1035→                                href={m.distro.website}
+  1036→                                target="_blank"
+  1037→                                rel="noopener noreferrer"
+  1038→                                className="glass-soft grid size-8 place-items-center rounded-lg border-white/15 text-foreground/80 transition-all hover:text-foreground"
+  1039→                                aria-label={`Visit ${m.distro.name} website`}
+  1040→                              >
+  1041→                                <ExternalLink className="size-3.5" />
+  1042→                              </a>
+  1043→                            </div>
+  1044→                          </div>
+  1045→                        </motion.div>
+  1046→                      )
+  1047→                  )}
+  1048→              </div>
+  1049→
+  1050→              {/* the rest */}
+  1051→              {matches.length > 3 && (
+  1052→                <motion.div
+  1053→                  initial={{ opacity: 0, y: 24 }}
+  1054→                  animate={{ opacity: 1, y: 0 }}
+  1055→                  transition={{ duration: 0.5, delay: 0.4 }}
+  1056→                  className="glass mt-5 rounded-3xl p-4 sm:p-5"
+  1057→                >
+  1058→                  <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+  1059→                    Also worth a look
+  1060→                  </p>
+  1061→                  <div className="mt-1 divide-y divide-white/5">
+  1062→                    {matches.slice(3).map((m, i) => (
+  1063→                      <div
+  1064→                        key={m.distro.id}
+  1065→                        className="flex items-center gap-3 px-1 py-3 sm:gap-4"
+  1066→                      >
+  1067→                        <span className="w-6 shrink-0 font-mono text-xs text-muted-foreground/60">
+  1068→                          #{i + 4}
+  1069→                        </span>
+  1070→                        <span
+  1071→                          className="size-2.5 shrink-0 rounded-full"
+  1072→                          style={{
+  1073→                            background: m.distro.color,
+  1074→                            boxShadow: `0 0 8px ${m.distro.color}66`,
+  1075→                          }}
+  1076→                        />
+  1077→                        <button
+  1078→                          type="button"
+  1079→                          onClick={() => setSelectedDistro(m.distro)}
+  1080→                          className="shrink-0 text-sm font-medium transition-colors hover:text-fuchsia-200"
+  1081→                        >
+  1082→                          {m.distro.name}
+  1083→                        </button>
+  1084→                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">
+  1085→                          {m.distro.tagline}
+  1086→                        </span>
+  1087→                        <div className="ml-auto flex shrink-0 items-center gap-2.5">
+  1088→                          <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-white/[0.06] sm:block">
+  1089→                            <motion.div
+  1090→                              initial={{ width: 0 }}
+  1091→                              animate={{ width: `${m.score}%` }}
+  1092→                              transition={{
+  1093→                                duration: 0.9,
+  1094→                                delay: 0.5 + i * 0.1,
+  1095→                              }}
+  1096→                              className="h-full rounded-full bg-gradient-to-r from-violet-500/70 to-fuchsia-500/70"
+  1097→                            />
+  1098→                          </div>
+  1099→                          <span className="font-mono text-xs text-fuchsia-200">
+  1100→                            {m.score}%
+  1101→                          </span>
+  1102→                        </div>
+  1103→                      </div>
+  1104→                    ))}
+  1105→                  </div>
+  1106→                </motion.div>
+  1107→              )}
+  1108→
+  1109→              {/* your answers — editable summary */}
+  1110→              <motion.div
+  1111→                initial={{ opacity: 0, y: 24 }}
+  1112→                animate={{ opacity: 1, y: 0 }}
+  1113→                transition={{ duration: 0.5, delay: 0.35 }}
+  1114→                className="glass mt-5 overflow-hidden rounded-3xl"
+  1115→              >
+  1116→                <button
+  1117→                  type="button"
+  1118→                  onClick={() => setAnswersOpen((o) => !o)}
+  1119→                  aria-expanded={answersOpen}
+  1120→                  className="flex w-full items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.04] sm:px-5"
+  1121→                >
+  1122→                  <span className="flex items-center gap-2.5">
+  1123→                    <ListChecks className="size-4 text-fuchsia-300" />
+  1124→                    <span className="text-[13px] font-semibold tracking-tight">
+  1125→                      Your answers
+  1126→                    </span>
+  1127→                    <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+  1128→                      {Object.keys(answers).length}/11
+  1129→                    </span>
+  1130→                  </span>
+  1131→                  <span className="flex items-center gap-2">
+  1132→                    <span className="text-[11px] text-muted-foreground">
+  1133→                      {answersOpen ? "Hide" : "Review & tweak"}
+  1134→                    </span>
+  1135→                    <ChevronDown
+  1136→                      className={cn(
+  1137→                        "size-4 text-muted-foreground transition-transform duration-300",
+  1138→                        answersOpen && "rotate-180"
+  1139→                      )}
+  1140→                    />
+  1141→                  </span>
+  1142→                </button>
+  1143→                <AnimatePresence initial={false}>
+  1144→                  {answersOpen && (
+  1145→                    <motion.div
+  1146→                      key="answers-body"
+  1147→                      initial={{ height: 0, opacity: 0 }}
+  1148→                      animate={{ height: "auto", opacity: 1 }}
+  1149→                      exit={{ height: 0, opacity: 0 }}
+  1150→                      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+  1151→                    >
+  1152→                      <div className="grid gap-1.5 border-t border-white/[0.07] px-3 py-3 sm:grid-cols-2 sm:px-4">
+  1153→                        {QUIZ_QUESTIONS.map((q, qi) => {
+  1154→                          const picked = (answers[q.id] ?? [])
+  1155→                            .map(
+  1156→                              (oid) =>
+  1157→                                q.options.find((o) => o.id === oid)?.label
+  1158→                            )
+  1159→                            .filter(Boolean) as string[];
+  1160→                          return (
+  1161→                            <button
+  1162→                              key={q.id}
+  1163→                              type="button"
+  1164→                              onClick={() => editAnswer(qi)}
+  1165→                              className="group flex items-center gap-2.5 rounded-xl border border-transparent px-2.5 py-2 text-left transition-all hover:border-white/10 hover:bg-white/[0.05]"
+  1166→                            >
+  1167→                              <span className="w-5 shrink-0 font-mono text-[10px] text-muted-foreground/50">
+  1168→                                {String(qi + 1).padStart(2, "0")}
+  1169→                              </span>
+  1170→                              <span className="min-w-0 flex-1">
+  1171→                                <span className="block truncate text-[11px] font-medium text-muted-foreground">
+  1172→                                  {q.title}
+  1173→                                </span>
+  1174→                                <span className="mt-0.5 block truncate text-xs font-semibold text-foreground/90">
+  1175→                                  {picked.length
+  1176→                                    ? picked.join(" · ")
+  1177→                                    : "Skipped"}
+  1178→                                </span>
+  1179→                              </span>
+  1180→                              <PenLine className="size-3.5 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-fuchsia-300" />
+  1181→                            </button>
+  1182→                          );
+  1183→                        })}
+  1184→                      </div>
+  1185→                      <p className="border-t border-white/[0.07] px-5 py-2.5 text-[11px] text-muted-foreground/70">
+  1186→                        Tap any answer to change it — the match updates once
+  1187→                        you finish the run again.
+  1188→                      </p>
+  1189→                    </motion.div>
+  1190→                  )}
+  1191→                </AnimatePresence>
+  1192→              </motion.div>
+  1193→
+  1194→              {/* actions */}
+  1195→              <motion.div
+  1196→                initial={{ opacity: 0 }}
+  1197→                animate={{ opacity: 1 }}
+  1198→                transition={{ delay: 0.55 }}
+  1199→                className="mt-6 flex flex-wrap items-center justify-center gap-2.5"
+  1200→              >
+  1201→                <Button
+  1202→                  onClick={viewOnGraph}
+  1203→                  className="h-11 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 text-sm font-medium shadow-[0_8px_30px_rgb(192_132_252/0.35)] hover:brightness-110"
+  1204→                >
+  1205→                  <MapPinned className="size-4" />
+  1206→                  View on the graph
+  1207→                </Button>
+  1208→                <Button
+  1209→                  variant="outline"
+  1210→                  onClick={share}
+  1211→                  className="glass h-11 rounded-xl border-white/10 px-5 text-sm font-medium text-foreground hover:bg-white/10 hover:text-foreground"
+  1212→                >
+  1213→                  <Share2 className="size-4" />
+  1214→                  Share results
+  1215→                </Button>
+  1216→                <Button
+  1217→                  variant="outline"
+  1218→                  onClick={retake}
+  1219→                  className="glass h-11 rounded-xl border-white/10 px-5 text-sm font-medium text-foreground hover:bg-white/10 hover:text-foreground"
+  1220→                >
+  1221→                  <RotateCcw className="size-4" />
+  1222→                  Retake quiz
+  1223→                </Button>
+  1224→              </motion.div>
+  1225→
+  1226→              <p className="mt-4 text-center text-[11px] text-muted-foreground/60">
+  1227→                Matches are scored from 17 weighted traits against your 11
+  1228→                answers — see the graph above to explore the full field.
+  1229→              </p>
+  1230→            </motion.div>
+  1231→          )}
+  1232→        </AnimatePresence>
+  1233→      </div>
+  1234→
+  1235→      <DistroDialog
+  1236→        distro={selectedDistro}
+  1237→        open={!!selectedDistro}
+  1238→        onOpenChange={(o) => !o && setSelectedDistro(null)}
+  1239→      />
+  1240→    </section>
+  1241→  );
+  1242→}
+  1243→
