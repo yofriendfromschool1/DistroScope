@@ -1,4 +1,4 @@
-# DistroScope
+# DistroScope - https://distroscope.netlify.app/
 
 **Find the Linux distribution that actually fits you.**
 
