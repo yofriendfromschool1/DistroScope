@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model QuizSession {
+  id         String   @id @default(cuid())
+  answers    String // JSON-encoded QuizAnswers
+  topMatch   String
+  matchScore Int
+  createdAt  DateTime @default(now())
+}
+
+model DistroFeedback {
+  id         String   @id @default(cuid())
+  distroName String
+  helpful    Boolean
+  createdAt  DateTime @default(now())
+}
+
+model CompareEvent {
+  id        String   @id @default(cuid())
+  ids       String // sorted comma-joined distro ids, e.g. "arch-linux,fedora"
+  createdAt DateTime @default(now())
+}
